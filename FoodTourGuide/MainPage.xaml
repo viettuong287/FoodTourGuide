@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FoodTourGuide.MainPage">
+
+    <VerticalStackLayout Padding="20">
+
+        <Label 
+            Text="Danh sách địa điểm"
+            FontSize="24"
+            HorizontalOptions="Center" />
+
+        <CollectionView x:Name="poiList">
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Frame Margin="5" Padding="10" BorderColor="Gray">
+                        <VerticalStackLayout>
+
+                            <Label Text="{Binding Name}" 
+                                   FontSize="18" 
+                                   FontAttributes="Bold"/>
+
+                            <Label Text="{Binding Description}" 
+                                   FontSize="14"/>
+
+                        </VerticalStackLayout>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+
+        </CollectionView>
+
+    </VerticalStackLayout>
+
+</ContentPage>
