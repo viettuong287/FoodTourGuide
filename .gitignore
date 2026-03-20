@@ -1,6 +1,21 @@
+# Visual Studio / .NET / MAUI
 .vs/
 bin/
 obj/
+# User / IDE
 *.user
 *.suo
-*.DS_Store
+*.userprefs
+.vscode/
+.idea/
+# macOS
+.DS_Store
+# NuGet
+packages/
+# SQLite runtime DBs
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+# Logs / temp
+*.log
