@@ -1,0 +1,510 @@
+@{
+    ViewData["Title"] = "Home";
+    var isLoggedIn = !string.IsNullOrWhiteSpace(Context.Session.GetString("AuthToken"));
+}
+
+@section Styles {
+<style>
+    :root {
+        --cream: #f7f3ed;
+        --cream-dark: #ede8df;
+        --ivory: #faf8f4;
+        --navy: #1e2d40;
+        --navy-mid: #2c3e55;
+        --gold: #b8964e;
+        --gold-light: #d4ae6a;
+        --text-dark: #1e2d40;
+        --text-mid: #4a5568;
+        --text-light: #718096;
+        --border: #d9cfc2;
+        --shadow-sm: 0 1px 4px rgba(30,45,64,0.07);
+        --shadow-md: 0 4px 16px rgba(30,45,64,0.10);
+        --radius: 10px;
+        --radius-sm: 6px;
+    }
+
+    /* ── HERO ── */
+    .hero-section {
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, #2e4060 100%);
+        border-radius: var(--radius);
+        padding: 48px 52px;
+        margin-bottom: 32px;
+        position: relative;
+        overflow: hidden;
+    }
+    .hero-section::before {
+        content: '';
+        position: absolute; top: -40px; right: -40px;
+        width: 220px; height: 220px; border-radius: 50%;
+        background: rgba(184,150,78,0.08); pointer-events: none;
+    }
+    .hero-section::after {
+        content: '';
+        position: absolute; bottom: -60px; right: 80px;
+        width: 160px; height: 160px; border-radius: 50%;
+        background: rgba(184,150,78,0.05); pointer-events: none;
+    }
+    .hero-ornament {
+        position: absolute; top: 20px; right: 36px;
+        opacity: 0.1; font-size: 110px; color: var(--gold);
+        pointer-events: none; line-height: 1;
+    }
+    .hero-tag {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(184,150,78,0.18);
+        border: 1px solid rgba(184,150,78,0.35);
+        color: var(--gold-light);
+        font-size: 11px; font-weight: 600;
+        letter-spacing: 0.1em; text-transform: uppercase;
+        padding: 4px 12px; border-radius: 20px; margin-bottom: 18px;
+    }
+    .hero-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.4rem; font-weight: 700;
+        color: var(--cream); line-height: 1.25;
+        margin-bottom: 14px; position: relative;
+    }
+    .hero-divider {
+        width: 48px; height: 2px;
+        background: linear-gradient(90deg, var(--gold), transparent);
+        margin-bottom: 28px;
+    }
+    .hero-desc {
+        font-size: 15px; color: rgba(247,243,237,0.72);
+        line-height: 1.7; max-width: 540px;
+        margin-bottom: 28px;
+    }
+    .btn-gold {
+        background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        color: var(--navy); border: none; font-weight: 600;
+        font-size: 13.5px; padding: 10px 24px;
+        border-radius: var(--radius-sm);
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 10px rgba(184,150,78,0.3);
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-gold:hover {
+        color: var(--navy);
+        box-shadow: 0 4px 16px rgba(184,150,78,0.4);
+        transform: translateY(-1px);
+    }
+    .btn-ghost-cream {
+        background: rgba(247,243,237,0.1); color: var(--cream);
+        border: 1px solid rgba(247,243,237,0.25);
+        font-weight: 500; font-size: 13.5px; padding: 10px 24px;
+        border-radius: var(--radius-sm); transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-ghost-cream:hover {
+        background: rgba(247,243,237,0.18); color: var(--cream);
+        border-color: rgba(247,243,237,0.45);
+    }
+
+    /* ── STATS ── */
+    .stat-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px 24px;
+        display: flex; align-items: center; gap: 16px;
+        height: 100%;
+        box-shadow: var(--shadow-sm);
+        transition: box-shadow 0.2s, transform 0.2s;
+        position: relative; overflow: hidden;
+    }
+    .stat-card::before {
+        content: '';
+        position: absolute; left: 0; top: 0; bottom: 0;
+        width: 4px; border-radius: 4px 0 0 4px;
+    }
+    .stat-card.blue::before  { background: var(--navy); }
+    .stat-card.green::before { background: #4a7c59; }
+    .stat-card.amber::before { background: var(--gold); }
+    .stat-card.teal::before  { background: #3d7a8a; }
+    .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .stat-icon-wrap {
+        width: 48px; height: 48px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .stat-icon-wrap.blue  { background: rgba(30,45,64,0.08); }
+    .stat-icon-wrap.green { background: rgba(74,124,89,0.1); }
+    .stat-icon-wrap.amber { background: rgba(184,150,78,0.12); }
+    .stat-icon-wrap.teal  { background: rgba(61,122,138,0.1); }
+    .stat-icon-wrap i { font-size: 22px; }
+    .stat-icon-wrap.blue  i { color: var(--navy); }
+    .stat-icon-wrap.green i { color: #4a7c59; }
+    .stat-icon-wrap.amber i { color: var(--gold); }
+    .stat-icon-wrap.teal  i { color: #3d7a8a; }
+    .stat-label {
+        font-size: 11.5px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--text-light); margin-bottom: 4px;
+    }
+    .stat-number {
+        font-family: 'Playfair Display', serif;
+        font-size: 28px; font-weight: 700;
+        color: var(--text-dark); line-height: 1;
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+        display: flex; align-items: center;
+        justify-content: space-between; margin-bottom: 20px;
+    }
+    .section-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.4rem; font-weight: 700;
+        color: var(--text-dark); margin: 0;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .section-title::after {
+        content: '';
+        display: inline-block; width: 32px; height: 2px;
+        background: var(--gold); border-radius: 2px;
+    }
+
+    /* ── FEATURE ROWS ── */
+    .feature-list { display: flex; flex-direction: column; gap: 0; }
+    .feature-row {
+        display: flex; align-items: center; gap: 20px;
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-top: none;
+        padding: 18px 24px;
+        transition: background 0.18s, box-shadow 0.18s;
+        position: relative;
+    }
+    .feature-row:first-child {
+        border-top: 1px solid var(--border);
+        border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .feature-row:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+    .feature-row:hover { background: #fff; box-shadow: var(--shadow-md); z-index: 1; }
+    .feature-row:hover .feature-row-num { color: var(--navy); }
+    .feature-row-num {
+        font-family: 'Playfair Display', serif;
+        font-size: 22px; font-weight: 700;
+        color: var(--border);
+        min-width: 36px; text-align: right;
+        line-height: 1; transition: color 0.18s; flex-shrink: 0;
+    }
+    .feature-row-divider {
+        width: 1px; height: 36px;
+        background: var(--border); flex-shrink: 0;
+    }
+    .feature-row-icon {
+        width: 40px; height: 40px; border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px; flex-shrink: 0;
+    }
+    .fi-navy  { background: rgba(30,45,64,0.08);   } .fi-navy  i { color: var(--navy); }
+    .fi-green { background: rgba(74,124,89,0.10);  } .fi-green i { color: #4a7c59; }
+    .fi-teal  { background: rgba(61,122,138,0.10); } .fi-teal  i { color: #3d7a8a; }
+    .fi-amber { background: rgba(184,150,78,0.12); } .fi-amber i { color: var(--gold); }
+    .fi-rust  { background: rgba(162,73,58,0.10);  } .fi-rust  i { color: #a2493a; }
+    .fi-slate { background: rgba(92,107,124,0.10); } .fi-slate i { color: #5c6b7c; }
+    .feature-row-body { flex: 1; min-width: 0; }
+    .feature-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 14.5px; font-weight: 600;
+        color: var(--text-dark); margin-bottom: 3px;
+    }
+    .feature-desc {
+        font-size: 13px; color: var(--text-mid);
+        line-height: 1.55; margin: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .btn-classic {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; font-weight: 600; letter-spacing: 0.03em;
+        padding: 6px 13px; border-radius: var(--radius-sm);
+        border: 1.5px solid; text-decoration: none;
+        transition: all 0.18s ease; background: transparent;
+        white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-classic.navy  { border-color: var(--navy);  color: var(--navy); }
+    .btn-classic.navy:hover  { background: var(--navy);  color: var(--cream); }
+    .btn-classic.green { border-color: #4a7c59; color: #4a7c59; }
+    .btn-classic.green:hover { background: #4a7c59; color: #fff; }
+    .btn-classic.teal  { border-color: #3d7a8a; color: #3d7a8a; }
+    .btn-classic.teal:hover  { background: #3d7a8a; color: #fff; }
+    .btn-classic.amber { border-color: var(--gold); color: var(--gold); }
+    .btn-classic.amber:hover { background: var(--gold); color: var(--navy); }
+    .btn-classic.rust  { border-color: #a2493a; color: #a2493a; }
+    .btn-classic.rust:hover  { background: #a2493a; color: #fff; }
+    .btn-classic.slate { border-color: #5c6b7c; color: #5c6b7c; }
+    .btn-classic.slate:hover { background: #5c6b7c; color: #fff; }
+
+    /* ── ACTIVITY ── */
+    .activity-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .activity-header {
+        padding: 16px 22px;
+        border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; justify-content: space-between;
+        background: var(--cream-dark);
+    }
+    .activity-header-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 15px; font-weight: 600;
+        color: var(--text-dark); margin: 0;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .activity-header-title i { color: var(--gold); }
+    .activity-item {
+        display: flex; align-items: center;
+        justify-content: space-between;
+        padding: 14px 22px;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.15s; gap: 12px;
+    }
+    .activity-item:last-child { border-bottom: none; }
+    .activity-item:hover { background: var(--cream); }
+    .activity-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        flex-shrink: 0; margin-right: 4px;
+    }
+    .activity-dot.active  { background: #4a7c59; }
+    .activity-dot.pending { background: var(--gold); }
+    .activity-dot.inactive { background: #a2493a; }
+    .activity-text {
+        font-size: 13.5px; color: var(--text-mid);
+        display: flex; align-items: center; gap: 8px; min-width: 0;
+    }
+    .activity-text strong { color: var(--text-dark); font-weight: 600; }
+    .activity-time { font-size: 12px; color: var(--text-light); white-space: nowrap; flex-shrink: 0; }
+    .btn-view-all {
+        font-size: 12.5px; font-weight: 600; color: var(--navy);
+        border: 1.5px solid var(--border); background: var(--ivory);
+        padding: 5px 14px; border-radius: var(--radius-sm);
+        text-decoration: none; transition: all 0.17s;
+    }
+    .btn-view-all:hover { background: var(--navy); color: var(--cream); border-color: var(--navy); }
+
+    @@media (max-width: 600px) {
+        .feature-row { flex-wrap: wrap; }
+        .feature-desc { white-space: normal; }
+        .btn-classic { margin-top: 6px; }
+        .hero-section { padding: 32px 28px; }
+        .hero-title { font-size: 1.8rem; }
+        .hero-ornament { display: none; }
+        .stat-number { font-size: 22px; }
+    }
+
+    @@keyframes fadeUp {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .hero-section { animation: fadeUp 0.45s ease both; }
+    .anim-1 { animation: fadeUp 0.45s ease 0.08s both; }
+    .anim-2 { animation: fadeUp 0.45s ease 0.15s both; }
+    .anim-3 { animation: fadeUp 0.45s ease 0.22s both; }
+    .anim-4 { animation: fadeUp 0.45s ease 0.29s both; }
+</style>
+}
+
+<!-- ── HERO ── -->
+<section class="hero-section" aria-labelledby="hero-heading">
+    <div class="hero-ornament" aria-hidden="true"><i class="bi bi-shop"></i></div>
+    <div class="hero-tag">
+        <i class="bi bi-stars" aria-hidden="true"></i>
+        Market Management System
+    </div>
+    <h1 id="hero-heading" class="hero-title">
+        Welcome to the<br>Management Portal
+    </h1>
+    <div class="hero-divider"></div>
+    <p class="hero-desc">
+        A comprehensive platform for managing market stalls, businesses, vendors, and visitors.
+        Streamline your market operations with our intuitive management tools.
+    </p>
+    @if (isLoggedIn)
+    {
+        <div class="d-flex flex-wrap gap-3">
+            <a asp-controller="Admin" asp-action="Dashboard" class="btn-gold">
+                <i class="bi bi-speedometer2" aria-hidden="true"></i> Go to Dashboard
+            </a>
+            <a asp-controller="Business" asp-action="Index" class="btn-ghost-cream">
+                <i class="bi bi-building" aria-hidden="true"></i> Manage Businesses
+            </a>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap gap-3">
+            <a asp-controller="Auth" asp-action="Login" class="btn-gold">
+                <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Sign In
+            </a>
+            <a asp-controller="Auth" asp-action="Register" class="btn-ghost-cream">
+                <i class="bi bi-person-plus" aria-hidden="true"></i> Create Account
+            </a>
+        </div>
+    }
+</section>
+
+<!-- ── STATS ── -->
+<section class="mb-4" aria-labelledby="stats-heading">
+    <h2 id="stats-heading" class="visually-hidden">Quick Statistics</h2>
+    <div class="row g-3">
+        <div class="col-sm-6 col-xl-3 anim-1">
+            <div class="stat-card blue">
+                <div class="stat-icon-wrap blue"><i class="bi bi-building" aria-hidden="true"></i></div>
+                <div>
+                    <div class="stat-label">Total Businesses</div>
+                    <div class="stat-number">156</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3 anim-2">
+            <div class="stat-card green">
+                <div class="stat-icon-wrap green"><i class="bi bi-shop-window" aria-hidden="true"></i></div>
+                <div>
+                    <div class="stat-label">Active Stalls</div>
+                    <div class="stat-number">142</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3 anim-3">
+            <div class="stat-card amber">
+                <div class="stat-icon-wrap amber"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
+                <div>
+                    <div class="stat-label">Pending Applications</div>
+                    <div class="stat-number">12</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-xl-3 anim-4">
+            <div class="stat-card teal">
+                <div class="stat-icon-wrap teal"><i class="bi bi-people" aria-hidden="true"></i></div>
+                <div>
+                    <div class="stat-label">Monthly Visitors</div>
+                    <div class="stat-number">8,500</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@if (isLoggedIn)
+{
+    <!-- ── KEY FEATURES ── -->
+    <section class="mb-4" aria-labelledby="features-heading">
+        <div class="section-header">
+            <h2 id="features-heading" class="section-title">Key Features</h2>
+        </div>
+        <div class="feature-list">
+
+            <div class="feature-row">
+                <span class="feature-row-num">01</span>
+                <div class="feature-row-divider" aria-hidden="true"></div>
+                <div class="feature-row-icon fi-navy"><i class="bi bi-building" aria-hidden="true"></i></div>
+                <div class="feature-row-body">
+                    <div class="feature-title">Business Management</div>
+                    <p class="feature-desc">Register and manage businesses, track vendors, and monitor performance.</p>
+                </div>
+                <a asp-controller="Business" asp-action="Index" class="btn-classic navy">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            <div class="feature-row">
+                <span class="feature-row-num">02</span>
+                <div class="feature-row-divider" aria-hidden="true"></div>
+                <div class="feature-row-icon fi-green"><i class="bi bi-shop-window" aria-hidden="true"></i></div>
+                <div class="feature-row-body">
+                    <div class="feature-title">Stall Management</div>
+                    <p class="feature-desc">Allocate stalls, track occupancy, manage rentals and locations.</p>
+                </div>
+                <a asp-controller="Stall" asp-action="Index" class="btn-classic green">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            <div class="feature-row">
+                <span class="feature-row-num">03</span>
+                <div class="feature-row-divider" aria-hidden="true"></div>
+                <div class="feature-row-icon fi-teal"><i class="bi bi-volume-up" aria-hidden="true"></i></div>
+                <div class="feature-row-body">
+                    <div class="feature-title">Narration Contents</div>
+                    <p class="feature-desc">Manage multilingual narration scripts and audio content for each stall.</p>
+                </div>
+                <a asp-controller="Narration" asp-action="StallNarrationContents" class="btn-classic teal">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+            <div class="feature-row">
+                <span class="feature-row-num">04</span>
+                <div class="feature-row-divider" aria-hidden="true"></div>
+                <div class="feature-row-icon fi-amber"><i class="bi bi-map" aria-hidden="true"></i></div>
+                <div class="feature-row-body">
+                    <div class="feature-title">Stall Location</div>
+                    <p class="feature-desc">View and manage stall locations on interactive maps for better visualization.</p>
+                </div>
+                <a asp-controller="StallLocation" asp-action="Index" class="btn-classic amber">
+                    Open <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+        </div>
+    </section>
+}
+
+<!-- ── RECENT ACTIVITY ── -->
+<section aria-labelledby="activity-heading">
+    <div class="section-header">
+        <h2 id="activity-heading" class="section-title">Recent Activity</h2>
+        @if (isLoggedIn)
+        {
+            <a asp-controller="Admin" asp-action="Dashboard" class="btn-view-all">View All</a>
+        }
+    </div>
+    <div class="activity-card">
+        <div class="activity-header">
+            <h5 class="activity-header-title">
+                <i class="bi bi-activity" aria-hidden="true"></i> Latest Updates
+            </h5>
+        </div>
+        <div>
+            <div class="activity-item">
+                <div class="activity-text">
+                    <span class="activity-dot active" aria-hidden="true"></span>
+                    <strong>Fresh Produce Co.</strong>&nbsp;registered a new stall at Section A
+                </div>
+                <span class="activity-time">2 hours ago</span>
+            </div>
+            <div class="activity-item">
+                <div class="activity-text">
+                    <span class="activity-dot pending" aria-hidden="true"></span>
+                    <strong>Tech Gadgets Plus</strong>&nbsp;submitted a business application
+                </div>
+                <span class="activity-time">5 hours ago</span>
+            </div>
+            <div class="activity-item">
+                <div class="activity-text">
+                    <span class="activity-dot active" aria-hidden="true"></span>
+                    <strong>Artisan Crafts</strong>&nbsp;renewed stall rental for 6 months
+                </div>
+                <span class="activity-time">1 day ago</span>
+            </div>
+            <div class="activity-item">
+                <div class="activity-text">
+                    <span class="activity-dot inactive" aria-hidden="true"></span>
+                    <strong>Stall C-302</strong>&nbsp;marked for maintenance
+                </div>
+                <span class="activity-time">2 days ago</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+<script>
+</script>
+}

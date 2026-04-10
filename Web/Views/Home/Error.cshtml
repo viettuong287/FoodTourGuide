@@ -1,0 +1,370 @@
+
+@{
+    ViewData["Title"] = "Error";
+}
+
+@section Styles {
+<style>
+    :root {
+        --cream: #f7f3ed;
+        --cream-dark: #ede8df;
+        --ivory: #faf8f4;
+        --navy: #1e2d40;
+        --gold: #b8964e;
+        --gold-light: #d4ae6a;
+        --text-dark: #1e2d40;
+        --text-mid: #4a5568;
+        --text-light: #718096;
+        --border: #d9cfc2;
+        --error-red: #a2493a;
+        --error-red-light: #c85a47;
+        --shadow-sm: 0 1px 4px rgba(30,45,64,0.07);
+        --shadow-md: 0 4px 16px rgba(30,45,64,0.10);
+        --radius: 10px;
+        --radius-sm: 6px;
+    }
+
+    /* ── ERROR HERO ── */
+    .error-hero {
+        background: linear-gradient(135deg, var(--error-red) 0%, var(--error-red-light) 100%);
+        border-radius: var(--radius);
+        padding: 48px 52px;
+        margin-bottom: 32px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+        animation: fadeUp 0.45s ease both;
+    }
+    .error-hero::before {
+        content: '';
+        position: absolute; top: -40px; right: -40px;
+        width: 220px; height: 220px; border-radius: 50%;
+        background: rgba(255,255,255,0.05); pointer-events: none;
+    }
+    .error-hero::after {
+        content: '';
+        position: absolute; bottom: -60px; left: -40px;
+        width: 180px; height: 180px; border-radius: 50%;
+        background: rgba(255,255,255,0.03); pointer-events: none;
+    }
+    .error-icon-wrap {
+        width: 90px; height: 90px;
+        margin: 0 auto 24px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        position: relative; z-index: 1;
+    }
+    .error-icon-wrap i { font-size: 42px; color: var(--cream); }
+    .error-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.2rem; font-weight: 700;
+        color: var(--cream); margin-bottom: 12px;
+        position: relative; z-index: 1;
+    }
+    .error-subtitle {
+        font-size: 15px; color: rgba(247,243,237,0.8);
+        line-height: 1.6; max-width: 560px;
+        margin: 0 auto;
+        position: relative; z-index: 1;
+    }
+
+    /* ── ERROR DETAILS ── */
+    .error-details-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        margin-bottom: 28px;
+    }
+    .error-details-header {
+        background: linear-gradient(135deg, var(--error-red), var(--error-red-light));
+        padding: 16px 24px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .error-details-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 16px; font-weight: 600;
+        color: var(--cream); margin: 0;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .error-details-body { padding: 24px; }
+    .error-info-row {
+        display: grid; grid-template-columns: 140px 1fr;
+        gap: 16px; padding: 12px 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .error-info-row:last-child { border-bottom: none; }
+    .error-info-label {
+        font-size: 13px; font-weight: 600;
+        color: var(--text-mid); letter-spacing: 0.02em;
+    }
+    .error-info-value {
+        font-family: 'Courier New', monospace;
+        font-size: 13.5px; color: var(--text-dark);
+        background: var(--cream);
+        padding: 4px 10px; border-radius: 4px; display: inline-block;
+    }
+
+    /* ── ACTION BUTTONS ── */
+    .error-actions {
+        display: flex; flex-wrap: wrap;
+        justify-content: center; gap: 12px; margin-bottom: 28px;
+    }
+    .btn-error-primary {
+        background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        color: var(--navy); border: none; font-weight: 600;
+        font-size: 14px; padding: 12px 28px;
+        border-radius: var(--radius-sm); transition: all 0.2s ease;
+        box-shadow: 0 2px 10px rgba(184,150,78,0.3);
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-error-primary:hover { color: var(--navy); box-shadow: 0 4px 16px rgba(184,150,78,0.4); transform: translateY(-1px); }
+    .btn-error-secondary {
+        background: var(--ivory); color: var(--text-dark);
+        border: 1.5px solid var(--border);
+        font-weight: 500; font-size: 14px; padding: 12px 28px;
+        border-radius: var(--radius-sm); transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        cursor: pointer;
+    }
+    .btn-error-secondary:hover { background: var(--cream); border-color: var(--gold); color: var(--text-dark); }
+    .btn-error-outline {
+        background: transparent; color: var(--error-red);
+        border: 1.5px solid var(--error-red);
+        font-weight: 500; font-size: 14px; padding: 12px 28px;
+        border-radius: var(--radius-sm); transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+        cursor: pointer;
+    }
+    .btn-error-outline:hover { background: var(--error-red); color: var(--cream); }
+
+    /* ── SUPPORT CARD ── */
+    .support-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        padding: 28px; text-align: center; margin-bottom: 28px;
+    }
+    .support-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 18px; font-weight: 600;
+        color: var(--text-dark); margin-bottom: 8px;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .support-title i { color: var(--gold); font-size: 22px; }
+    .support-desc { font-size: 14px; color: var(--text-mid); line-height: 1.6; margin-bottom: 20px; }
+    .support-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .btn-support {
+        background: var(--ivory); color: var(--navy);
+        border: 1.5px solid var(--navy);
+        font-weight: 500; font-size: 13.5px; padding: 10px 22px;
+        border-radius: var(--radius-sm); transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-support:hover { background: var(--navy); color: var(--cream); }
+    .btn-support.success { border-color: #4a7c59; color: #4a7c59; }
+    .btn-support.success:hover { background: #4a7c59; color: #fff; }
+
+    /* ── ERROR TYPES ── */
+    .error-types-section { margin-top: 32px; }
+    .error-types-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .error-types-header {
+        background: var(--cream-dark);
+        padding: 16px 24px; border-bottom: 1px solid var(--border);
+    }
+    .error-types-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 16px; font-weight: 600;
+        color: var(--text-dark); margin: 0;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .error-types-title i { color: var(--gold); }
+    .error-types-body { padding: 24px; }
+    .error-type-item {
+        background: #fff; border: 1px solid var(--border);
+        border-radius: 8px; padding: 20px; height: 100%;
+        transition: all 0.2s ease;
+    }
+    .error-type-item:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .error-type-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .error-type-icon { font-size: 20px; }
+    .error-type-icon.warning { color: var(--gold); }
+    .error-type-icon.danger { color: var(--error-red); }
+    .error-type-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 15px; font-weight: 600;
+        color: var(--text-dark); margin: 0;
+    }
+    .error-type-desc { font-size: 13px; color: var(--text-mid); line-height: 1.6; margin: 0; }
+
+    @@media (max-width: 900px) {
+        .error-hero { padding: 32px 24px; }
+        .error-title { font-size: 1.7rem; }
+        .error-info-row { grid-template-columns: 1fr; gap: 8px; }
+        .error-actions { flex-direction: column; }
+        .btn-error-primary, .btn-error-secondary, .btn-error-outline { width: 100%; justify-content: center; }
+    }
+    @@media (max-width: 576px) {
+        .error-title { font-size: 1.4rem; }
+        .error-icon-wrap { width: 70px; height: 70px; }
+        .error-icon-wrap i { font-size: 32px; }
+        .support-actions { flex-direction: column; }
+        .btn-support { width: 100%; justify-content: center; }
+    }
+
+    @@keyframes fadeUp {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .anim-1 { animation: fadeUp 0.45s ease 0.08s both; }
+    .anim-2 { animation: fadeUp 0.45s ease 0.15s both; }
+    .anim-3 { animation: fadeUp 0.45s ease 0.22s both; }
+</style>
+}
+
+<!-- ── ERROR HERO ── -->
+<section class="error-hero" aria-labelledby="error-heading">
+    <div class="error-icon-wrap">
+        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+    </div>
+    <h1 id="error-heading" class="error-title">Oops! Something went wrong</h1>
+    <p class="error-subtitle">
+        We encountered an unexpected error while processing your request.
+        Please try again later or contact support if the problem persists.
+    </p>
+</section>
+
+<!-- ── ERROR DETAILS ── -->
+<section class="error-details-card anim-1" aria-labelledby="error-details-heading">
+    <div class="error-details-header">
+        <h2 id="error-details-heading" class="error-details-title">
+            <i class="bi bi-bug" aria-hidden="true"></i>
+            Error Details
+        </h2>
+    </div>
+    <div class="error-details-body">
+        <div class="error-info-row">
+            <div class="error-info-label">Error Code:</div>
+            <div class="error-info-value">500</div>
+        </div>
+        <div class="error-info-row">
+            <div class="error-info-label">Request ID:</div>
+            <div class="error-info-value" id="requestId">MMS-ERR-000000</div>
+        </div>
+        <div class="error-info-row">
+            <div class="error-info-label">Timestamp:</div>
+            <div class="error-info-value" id="errorTimestamp">Loading...</div>
+        </div>
+        <div class="error-info-row">
+            <div class="error-info-label">Page:</div>
+            <div class="error-info-value" id="errorPage">Loading...</div>
+        </div>
+    </div>
+</section>
+
+<!-- ── ACTION BUTTONS ── -->
+<section class="error-actions anim-2" aria-label="Error page actions">
+    <a asp-controller="Home" asp-action="Index" class="btn-error-primary">
+        <i class="bi bi-house-door" aria-hidden="true"></i>
+        Go to Home
+    </a>
+    <button type="button" class="btn-error-secondary" onclick="history.back()">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i>
+        Go Back
+    </button>
+    <button type="button" class="btn-error-outline" onclick="location.reload()">
+        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+        Try Again
+    </button>
+</section>
+
+<!-- ── SUPPORT ── -->
+<section class="support-card anim-3" aria-labelledby="support-heading">
+    <h2 id="support-heading" class="support-title">
+        <i class="bi bi-headset" aria-hidden="true"></i>
+        Need Help?
+    </h2>
+    <p class="support-desc">
+        If this error continues, please contact our support team with the Request ID above.
+    </p>
+    <div class="support-actions">
+        <a href="mailto:support@@marketmanagement.com" class="btn-support">
+            <i class="bi bi-envelope" aria-hidden="true"></i>
+            Email Support
+        </a>
+        <a href="tel:+15551234567" class="btn-support success">
+            <i class="bi bi-telephone" aria-hidden="true"></i>
+            Call Support
+        </a>
+    </div>
+</section>
+
+<!-- ── COMMON ERROR TYPES ── -->
+<section class="error-types-section" aria-labelledby="error-types-heading">
+    <div class="error-types-card">
+        <div class="error-types-header">
+            <h2 id="error-types-heading" class="error-types-title">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                Common Error Types
+            </h2>
+        </div>
+        <div class="error-types-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="error-type-item">
+                        <div class="error-type-header">
+                            <i class="bi bi-question-circle error-type-icon warning" aria-hidden="true"></i>
+                            <h3 class="error-type-title">404 - Not Found</h3>
+                        </div>
+                        <p class="error-type-desc">The page you're looking for doesn't exist or has been moved.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="error-type-item">
+                        <div class="error-type-header">
+                            <i class="bi bi-x-circle error-type-icon danger" aria-hidden="true"></i>
+                            <h3 class="error-type-title">403 - Forbidden</h3>
+                        </div>
+                        <p class="error-type-desc">You don't have permission to access this resource.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="error-type-item">
+                        <div class="error-type-header">
+                            <i class="bi bi-exclamation-circle error-type-icon danger" aria-hidden="true"></i>
+                            <h3 class="error-type-title">500 - Server Error</h3>
+                        </div>
+                        <p class="error-type-desc">An internal server error occurred. Please try again later.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@section Scripts {
+<script>
+    $(document).ready(function () {
+        $('#errorTimestamp').text(new Date().toLocaleString());
+        $('#errorPage').text(document.referrer || 'Direct access');
+        // Generate a unique request ID
+        var id = 'MMS-' + new Date().getFullYear() +
+            String(new Date().getMonth()+1).padStart(2,'0') +
+            String(new Date().getDate()).padStart(2,'0') + '-' +
+            Math.random().toString(36).substr(2, 6).toUpperCase();
+        $('#requestId').text(id);
+    });
+</script>
+}

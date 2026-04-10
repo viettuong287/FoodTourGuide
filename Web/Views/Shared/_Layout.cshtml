@@ -1,0 +1,263 @@
+@{
+    var token = Context.Session.GetString("AuthToken");
+    var isLoggedIn = !string.IsNullOrWhiteSpace(token);
+    var userName = Context.Session.GetString("UserName") ?? "User";
+    var userRole = Context.Session.GetString("UserRole") ?? "";
+    var isAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
+    var isBusinessOwner = string.Equals(userRole, "BusinessOwner", StringComparison.OrdinalIgnoreCase);
+    var canShowSidebar = isLoggedIn && (isAdmin || isBusinessOwner);
+    var ctrl = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+    Func<string, string> Nav = c => ctrl == c ? "sidebar-link active" : "sidebar-link";
+    var adminOpen = ctrl == "Admin";
+    var businessOpen = new[] { "Business", "Stall", "StallLocation", "StallGeoFence", "Narration" }.Contains(ctrl);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Market Management</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/layout.css" asp-append-version="true" />
+    <style>
+        html, body { height: 100%; margin: 0; overflow-x: hidden; background-color: #f7f3ed; color: #1e2d40; }
+        .app-shell { display: flex; min-height: 100vh; width: 100%; }
+        .sidebar { width: 240px; min-width: 240px; background: #1e2d40; display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100vh; z-index: 1000; overflow-y: auto; border-right: 1px solid rgba(184,150,78,0.2); }
+        .sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 22px 20px 18px; border-bottom: 1px solid rgba(184,150,78,0.25); text-decoration: none; color: #f7f3ed; }
+        .sidebar-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #b8964e, #d4ae6a); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .sidebar-brand-icon i { color: #1e2d40; font-size: 18px; }
+        .sidebar-brand-text { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
+        .sidebar-brand-sub { font-size: 10px; color: #d4ae6a; letter-spacing: 0.08em; text-transform: uppercase; }
+        .sidebar-nav { padding: 14px 0; flex: 1; }
+        .sidebar-label { font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(184,150,78,0.6); padding: 14px 20px 4px; }
+        .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 9px 20px; color: rgba(247,243,237,0.75); text-decoration: none; font-size: 13.5px; transition: all 0.18s ease; border: none; background: none; width: 100%; border-left: 3px solid transparent; text-align: left; cursor: pointer; }
+        .sidebar-link i { font-size: 15px; width: 18px; }
+        .sidebar-link:hover, .sidebar-link.active { color: #f7f3ed; background: rgba(184,150,78,0.1); border-left-color: #b8964e; }
+        .sidebar-link.active { font-weight: 500; }
+        .sidebar-sub { background: rgba(0,0,0,0.15); display: none; }
+        .sidebar-sub.show { display: block; }
+        .sidebar-sub .sidebar-link { padding-left: 46px; font-size: 13px; }
+        .sidebar-toggle-btn { display: flex; align-items: center; justify-content: space-between; }
+        .sidebar-toggle-btn .chevron { font-size: 11px; transition: transform 0.2s; margin-left: auto; }
+        .sidebar-toggle-btn.expanded .chevron { transform: rotate(180deg); }
+        .sidebar-user { padding: 14px 20px; border-top: 1px solid rgba(184,150,78,0.2); display: flex; align-items: center; gap: 10px; }
+        .sidebar-user-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #b8964e, #d4ae6a); display: flex; align-items: center; justify-content: center; }
+        .sidebar-user-avatar i { color: #1e2d40; font-size: 16px; }
+        .sidebar-user-info { flex: 1; min-width: 0; }
+        .sidebar-user-name { font-size: 12.5px; font-weight: 500; color: #f7f3ed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-user-role { font-size: 10.5px; color: rgba(212,174,106,0.7); }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 999; }
+        .sidebar-overlay.show { display: block; }
+        .main-area { margin-left: 240px; min-height: 100vh; display: flex; flex-direction: column; width: calc(100% - 240px); min-width: 0; }
+        .main-area.no-sidebar { margin-left: 0; width: 100%; }
+        .top-bar { display: none; background: #1e2d40; padding: 12px 20px; align-items: center; gap: 12px; border-bottom: 1px solid rgba(184,150,78,0.2); color: #f7f3ed; }
+        .top-bar-toggle { background: none; border: none; color: #f7f3ed; font-size: 20px; cursor: pointer; padding: 0; line-height: 1; }
+        .top-bar-brand { font-size: 14px; font-weight: 700; }
+        .page-content { flex: 1; padding: 32px 36px 40px; overflow-y: auto; min-width: 0; }
+        .page-footer { background: #ede8df; border-top: 1px solid #d9cfc2; padding: 16px 36px; font-size: 12.5px; color: #718096; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+        .page-footer a { color: #718096; text-decoration: none; }
+        .page-footer a:hover { color: #b8964e; }
+        .public-nav { display: flex; gap: 10px; align-items: center; }
+        .public-link { color: rgba(247,243,237,0.85); text-decoration: none; font-size: 13.5px; }
+        .public-link:hover { color: #d4ae6a; }
+        @@media (max-width: 900px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.28s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-area { margin-left: 0; width: 100%; }
+            .top-bar { display: flex; }
+            .page-content { padding: 20px 18px 32px; }
+        }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    @if (canShowSidebar)
+    {
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    }
+
+    <div class="app-shell">
+        @if (canShowSidebar)
+        {
+            <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+                <a class="sidebar-brand" asp-controller="Home" asp-action="Index">
+                    <div class="sidebar-brand-icon"><i class="bi bi-shop"></i></div>
+                    <div>
+                        <div class="sidebar-brand-text">Market Management</div>
+                        <div class="sidebar-brand-sub">System</div>
+                    </div>
+                </a>
+
+                <nav class="sidebar-nav">
+                    <div class="sidebar-label">General</div>
+                    <a class="@Nav("Home")" asp-controller="Home" asp-action="Index">
+                        <i class="bi bi-house-door"></i> Home
+                    </a>
+
+                    @if (isAdmin)
+                    {
+                        <div class="sidebar-label">Admin</div>
+                        <button class="sidebar-link sidebar-toggle-btn @(adminOpen ? "expanded" : "")" onclick="toggleSub('adminSub', this)" aria-expanded="@(adminOpen ? "true" : "false")">
+                            <span style="display:flex;align-items:center;gap:10px;"><i class="bi bi-shield-lock"></i> Admin</span>
+                            <i class="bi bi-chevron-down chevron"></i>
+                        </button>
+                        <div class="sidebar-sub @(adminOpen ? "show" : "")" id="adminSub">
+                            <a class="@(ctrl == "Admin" && action == "Dashboard" ? "sidebar-link active" : "sidebar-link")"
+                               asp-controller="Admin" asp-action="Dashboard">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                            <a class="@(ctrl == "Admin" && action == "UserRoleManagement" ? "sidebar-link active" : "sidebar-link")"
+                               asp-controller="Admin" asp-action="UserRoleManagement">
+                                <i class="bi bi-people"></i> User/Role Mgmt
+                            </a>
+                            <a class="@(ctrl == "Admin" && action == "Statistics" ? "sidebar-link active" : "sidebar-link")"
+                               asp-controller="Admin" asp-action="Statistics">
+                                <i class="bi bi-bar-chart"></i> Statistics
+                            </a>
+                        </div>
+                    }
+
+                    @if (isAdmin || isBusinessOwner)
+                    {
+                        <div class="sidebar-label">Management</div>
+                        <button class="sidebar-link sidebar-toggle-btn @(businessOpen ? "expanded" : "")" onclick="toggleSub('businessSub', this)" aria-expanded="@(businessOpen ? "true" : "false")">
+                            <span style="display:flex;align-items:center;gap:10px;"><i class="bi bi-gear"></i> Management</span>
+                            <i class="bi bi-chevron-down chevron"></i>
+                        </button>
+                        <div class="sidebar-sub @(businessOpen ? "show" : "")" id="businessSub">
+                            @if (isAdmin || isBusinessOwner)
+                            {
+                                <a class="@Nav("Business")" asp-controller="Business" asp-action="Index">
+                                    <i class="bi bi-building"></i> Business Management
+                                </a>
+                            }
+                            <a class="@Nav("Stall")" asp-controller="Stall" asp-action="Index">
+                                <i class="bi bi-shop-window"></i> Stall Management
+                            </a>
+                            <a class="@Nav("Narration")" asp-controller="Narration" asp-action="StallNarrationContents">
+                                <i class="bi bi-volume-up"></i> Narration Contents
+                            </a>
+                            <a class="@Nav("StallLocation")" asp-controller="StallLocation" asp-action="Index">
+                                <i class="bi bi-map"></i> Stall Location
+                            </a>
+                        </div>
+                    }
+
+                    <div class="sidebar-label">More</div>
+                    <a class="@Nav("Home")" asp-controller="Home" asp-action="Privacy">
+                        <i class="bi bi-lock"></i> Privacy
+                    </a>
+                </nav>
+
+                <div class="sidebar-user">
+                    <div class="sidebar-user-avatar"><i class="bi bi-person-fill"></i></div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name">@userName</div>
+                        <div class="sidebar-user-role">@userRole</div>
+                    </div>
+                    <form method="post" asp-controller="Auth" asp-action="Logout" style="display:inline;">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" title="Sign Out" style="color: rgba(247,243,237,0.5); font-size: 13px; background: none; border: none; cursor: pointer; padding: 2px 4px; border-radius: 4px;">
+                            <i class="bi bi-box-arrow-right"></i>
+                        </button>
+                    </form>
+                </div>
+            </aside>
+        }
+
+        <div class="main-area @(canShowSidebar ? "" : "no-sidebar")">
+            <div class="top-bar" id="topBar">
+                @if (canShowSidebar)
+                {
+                    <button class="top-bar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation"><i class="bi bi-list"></i></button>
+                    <span class="top-bar-brand">Market Management</span>
+                }
+                else
+                {
+                    <span class="top-bar-brand">Market Management</span>
+                    <div class="ms-auto public-nav">
+                        <a class="public-link" asp-controller="Home" asp-action="Index">Home</a>
+                        <a class="public-link" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                        @if (isLoggedIn)
+                        {
+                            <span class="public-link">@userName</span>
+                            <form method="post" asp-controller="Auth" asp-action="Logout" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-light">Sign Out</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <a class="public-link" asp-controller="Auth" asp-action="Login">Sign In</a>
+                            <a class="public-link" asp-controller="Auth" asp-action="Register">Register</a>
+                        }
+                    </div>
+                }
+            </div>
+
+            <main class="page-content" role="main">
+                @RenderBody()
+            </main>
+
+            <footer class="page-footer" role="contentinfo">
+                <span>&copy; @DateTime.Now.Year Market Management System. All rights reserved.</span>
+                <div>
+                    <a asp-controller="Home" asp-action="Privacy" class="me-3">Privacy Policy</a>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script>
+        // Sync JWT token to localStorage
+        $(document).ready(function () {
+            var serverToken = '@Html.Raw(Context.Session.GetString("AuthToken") ?? "")';
+            if (serverToken && serverToken.trim() !== '') {
+                localStorage.setItem('jwtToken', serverToken);
+            } else {
+                localStorage.removeItem('jwtToken');
+            }
+        });
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (sidebar) sidebar.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('show');
+        }
+
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', toggleSidebar);
+        }
+
+        function toggleSub(id, btn) {
+            const sub = document.getElementById(id);
+            if (!sub) return;
+            const isOpen = sub.classList.contains('show');
+            document.querySelectorAll('.sidebar-sub').forEach(s => s.classList.remove('show'));
+            document.querySelectorAll('.sidebar-toggle-btn').forEach(b => {
+                b.classList.remove('expanded');
+                b.setAttribute('aria-expanded', 'false');
+            });
+            if (!isOpen) {
+                sub.classList.add('show');
+                btn.classList.add('expanded');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+        }
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
