@@ -1,7 +1,8 @@
-using System.Security.Claims;
 using System.Text.RegularExpressions;
+using Api.Authorization;
 using Api.Extensions;
 using Api.Infrastructure.Persistence;
+using Api.Infrastructure.Persistence.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,7 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class StallController : ControllerBase
+    public class StallController : AppControllerBase
     {
         private const int MaxPageSize = 100;
         private readonly AppDbContext _context;
@@ -44,6 +45,7 @@ namespace Api.Controllers
         /// <response code="403">Không có quyền truy cập</response>
         /// <response code="404">Không tìm thấy business</response>
         [HttpPost]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> CreateStall([FromBody] StallCreateDto request)
         {
             _logger.LogInformation("Bắt đầu tạo stall - Name: {Name}", request.Name);
@@ -52,12 +54,6 @@ namespace Api.Controllers
             {
                 _logger.LogWarning("Không xác thực khi tạo stall");
                 return this.UnauthorizedResult("Không xác thực");
-            }
-
-            if (!IsAdmin() && !IsBusinessOwner())
-            {
-                _logger.LogWarning("Không có quyền tạo stall - UserId: {UserId}", userId);
-                return this.ForbiddenResult("Không có quyền truy cập");
             }
 
             _logger.LogDebug("Truy vấn business - BusinessId: {BusinessId}", request.BusinessId);
@@ -74,6 +70,22 @@ namespace Api.Controllers
                 return this.ForbiddenResult("Không có quyền truy cập");
             }
 
+            // Kiểm tra giới hạn số stall theo plan (Admin bypass)
+            if (!IsAdmin())
+            {
+                var effectivePlan = business.PlanExpiresAt.HasValue && business.PlanExpiresAt.Value <= DateTimeOffset.UtcNow
+                    ? Api.Domain.SubscriptionPlan.Free
+                    : business.Plan;
+
+                var maxStalls = Api.Domain.SubscriptionPlan.GetMaxStalls(effectivePlan);
+                var stallCount = await _context.Stalls.CountAsync(s => s.BusinessId == business.Id);
+                if (stallCount >= maxStalls)
+                {
+                    _logger.LogWarning("Vượt giới hạn stall theo plan - BusinessId: {BusinessId}, Plan: {Plan}, Count: {Count}", request.BusinessId, effectivePlan, stallCount);
+                    return this.ForbiddenResult($"Gói {effectivePlan} chỉ cho phép tối đa {maxStalls} gian hàng. Vui lòng nâng cấp gói.");
+                }
+            }
+
             var slug = NormalizeSlug(string.IsNullOrWhiteSpace(request.Slug) ? request.Name : request.Slug);
             if (string.IsNullOrWhiteSpace(slug))
             {
@@ -81,7 +93,7 @@ namespace Api.Controllers
                 return this.BadRequestResult("Slug không hợp lệ", "Slug");
             }
 
-            var slugExists = await _context.Stalls.AnyAsync(s => s.Slug == slug);
+            var slugExists = await _context.Stalls.SlugExistsAsync(slug);
             if (slugExists)
             {
                 _logger.LogWarning("Slug đã tồn tại khi tạo stall - Slug: {Slug}", slug);
@@ -121,6 +133,7 @@ namespace Api.Controllers
         /// <response code="403">Không có quyền truy cập</response>
         /// <response code="404">Không tìm thấy stall</response>
         [HttpPut("{id:guid}")]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> UpdateStall(Guid id, [FromBody] StallUpdateDto request)
         {
             _logger.LogInformation("Bắt đầu cập nhật stall - Id: {StallId}", id);
@@ -157,7 +170,7 @@ namespace Api.Controllers
 
             if (!string.Equals(stall.Slug, normalizedSlug, StringComparison.OrdinalIgnoreCase))
             {
-                var slugExists = await _context.Stalls.AnyAsync(s => s.Slug == normalizedSlug && s.Id != id);
+                var slugExists = await _context.Stalls.SlugExistsAsync(normalizedSlug, excludeId: id);
                 if (slugExists)
                 {
                     _logger.LogWarning("Slug đã tồn tại khi cập nhật stall - Slug: {Slug}", normalizedSlug);
@@ -193,6 +206,7 @@ namespace Api.Controllers
         /// <response code="403">Không có quyền truy cập</response>
         /// <response code="404">Không tìm thấy stall</response>
         [HttpGet("{id:guid}")]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> GetStallDetail(Guid id)
         {
             _logger.LogInformation("Bắt đầu lấy chi tiết stall - Id: {StallId}", id);
@@ -239,22 +253,15 @@ namespace Api.Controllers
         /// <response code="401">Không xác thực</response>
         /// <response code="403">Không có quyền truy cập</response>
         [HttpGet]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> GetStalls([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null, [FromQuery] Guid? businessId = null)
         {
             _logger.LogInformation("<<BEGIN>>Bắt đầu lấy danh sách stall - Page: {Page}, PageSize: {PageSize}", page, pageSize);
 
-            // Lấy userId từ claim, nếu không có -> trả về 401
             if (!TryGetUserId(out var userId))
             {
                 _logger.LogWarning("Không xác thực khi lấy danh sách stall");
                 return this.UnauthorizedResult("Không xác thực");
-            }
-
-            // Kiểm tra quyền: chỉ Admin hoặc BusinessOwner mới được truy cập
-            if (!IsAdmin() && !IsBusinessOwner())
-            {
-                _logger.LogWarning("Không có quyền truy cập danh sách stall - UserId: {UserId}", userId);
-                return this.ForbiddenResult("Không có quyền truy cập");
             }
 
             // Chuẩn hóa tham số phân trang
@@ -338,36 +345,5 @@ namespace Api.Controllers
             return slug.Trim('-');
         }
 
-        private static DateTimeOffset ConvertFromUtc(DateTimeOffset utcDateTime, TimeZoneInfo timeZone)
-        {
-            var utc = utcDateTime.UtcDateTime;
-            var local = TimeZoneInfo.ConvertTimeFromUtc(utc, timeZone);
-            var offset = timeZone.GetUtcOffset(utc);
-            return new DateTimeOffset(local, offset);
-        }
-
-        private TimeZoneInfo GetTimeZone()
-        {
-            var timeZoneId = HttpContext.Request.Headers["X-TimeZoneId"].ToString();
-            return string.IsNullOrWhiteSpace(timeZoneId)
-                ? TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")
-                : TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-        }
-
-        private bool TryGetUserId(out Guid userId)
-        {
-            var currentUserIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return Guid.TryParse(currentUserIdValue, out userId);
-        }
-
-        private bool IsAdmin()
-        {
-            return User.IsInRole("Admin") || User.IsInRole("ADMIN");
-        }
-
-        private bool IsBusinessOwner()
-        {
-            return User.IsInRole("BusinessOwner") || User.IsInRole("BUSINESSOWNER");
-        }
     }
 }

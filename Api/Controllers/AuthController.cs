@@ -4,6 +4,7 @@ using Api.Domain.Entities;
 using Api.Domain.Settings;
 using Api.Extensions;
 using Api.Infrastructure.Persistence;
+using Api.Infrastructure.Persistence.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using BCrypt.Net;
@@ -56,8 +57,7 @@ namespace Api.Controllers
             {
                 // 1. Validate Email đã tồn tại chưa
                 _logger.LogDebug("Kiểm tra email đã tồn tại: {Email}", request.Email);
-                var existingEmail = await _context.Users
-                    .AnyAsync(u => u.NormalizedEmail == request.Email.ToUpper());
+                var existingEmail = await _context.Users.EmailExistsAsync(request.Email);
 
                 if (existingEmail)
                 {
@@ -67,8 +67,7 @@ namespace Api.Controllers
 
                 // 2. Validate UserName đã tồn tại chưa
                 _logger.LogDebug("Kiểm tra username đã tồn tại: {UserName}", request.UserName);
-                var existingUserName = await _context.Users
-                    .AnyAsync(u => u.NormalizedUserName == request.UserName.ToUpper());
+                var existingUserName = await _context.Users.UserNameExistsAsync(request.UserName);
 
                 if (existingUserName)
                 {
@@ -190,7 +189,8 @@ namespace Api.Controllers
                 var user = await _context.Users
                     .Include(u => u.UserRoles)
                         .ThenInclude(ur => ur.Role)
-                    .FirstOrDefaultAsync(u => u.NormalizedEmail == request.Email.ToUpper());
+                    .FirstOrDefaultAsync(u => u.NormalizedEmail == request.Email.ToUpper()
+                                          || u.NormalizedUserName == request.Email.ToUpper());
 
                 if (user == null)
                 {

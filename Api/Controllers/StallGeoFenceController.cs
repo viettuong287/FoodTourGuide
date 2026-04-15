@@ -1,4 +1,4 @@
-using System.Security.Claims;
+using Api.Authorization;
 using Api.Extensions;
 using Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -13,7 +13,7 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/stall-geo-fence")]
     [Authorize]
-    public class StallGeoFenceController : ControllerBase
+    public class StallGeoFenceController : AppControllerBase
     {
         private const int MaxPageSize = 100;
         private readonly AppDbContext _context;
@@ -26,6 +26,7 @@ namespace Api.Controllers
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> Create([FromBody] StallGeoFenceCreateDto request)
         {
             _logger.LogInformation("Bắt đầu tạo stall geofence - StallId: {StallId}", request.StallId);
@@ -33,11 +34,6 @@ namespace Api.Controllers
             if (!TryGetUserId(out var userId))
             {
                 return this.UnauthorizedResult("Không xác thực");
-            }
-
-            if (!IsAdmin() && !IsBusinessOwner())
-            {
-                return this.ForbiddenResult("Không có quyền truy cập");
             }
 
             var stall = await _context.Stalls
@@ -69,6 +65,7 @@ namespace Api.Controllers
         }
 
         [HttpPut("{id:guid}")]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> Update(Guid id, [FromBody] StallGeoFenceUpdateDto request)
         {
             _logger.LogInformation("Bắt đầu cập nhật stall geofence - Id: {GeoFenceId}", id);
@@ -76,11 +73,6 @@ namespace Api.Controllers
             if (!TryGetUserId(out var userId))
             {
                 return this.UnauthorizedResult("Không xác thực");
-            }
-
-            if (!IsAdmin() && !IsBusinessOwner())
-            {
-                return this.ForbiddenResult("Không có quyền truy cập");
             }
 
             var geoFence = await _context.StallGeoFences
@@ -108,6 +100,7 @@ namespace Api.Controllers
         }
 
         [HttpGet("{id:guid}")]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> GetDetail(Guid id)
         {
             _logger.LogInformation("Bắt đầu lấy chi tiết stall geofence - Id: {GeoFenceId}", id);
@@ -137,6 +130,7 @@ namespace Api.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
         public async Task<IActionResult> GetList([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] Guid? stallId = null)
         {
             _logger.LogInformation("Bắt đầu lấy danh sách stall geofence - Page: {Page}, PageSize: {PageSize}", page, pageSize);
@@ -144,11 +138,6 @@ namespace Api.Controllers
             if (!TryGetUserId(out var userId))
             {
                 return this.UnauthorizedResult("Không xác thực");
-            }
-
-            if (!IsAdmin() && !IsBusinessOwner())
-            {
-                return this.ForbiddenResult("Không có quyền truy cập");
             }
 
             page = Math.Max(1, page);
@@ -202,20 +191,5 @@ namespace Api.Controllers
             };
         }
 
-        private bool TryGetUserId(out Guid userId)
-        {
-            var currentUserIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return Guid.TryParse(currentUserIdValue, out userId);
-        }
-
-        private bool IsAdmin()
-        {
-            return User.IsInRole("Admin") || User.IsInRole("ADMIN");
-        }
-
-        private bool IsBusinessOwner()
-        {
-            return User.IsInRole("BusinessOwner") || User.IsInRole("BUSINESSOWNER");
-        }
     }
 }
