@@ -4,6 +4,7 @@ using Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260414014042_SyncModelAfterConfigRestore")]
+    partial class SyncModelAfterConfigRestore
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -55,16 +58,6 @@ namespace Api.Migrations
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Plan")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)")
-                        .HasDefaultValue("Free");
-
-                    b.Property<DateTimeOffset?>("PlanExpiresAt")
-                        .HasColumnType("datetimeoffset(3)");
-
                     b.Property<string>("TaxCode")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
@@ -105,38 +98,6 @@ namespace Api.Migrations
                         .IsUnique();
 
                     b.ToTable("BusinessOwnerProfiles", (string)null);
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.DeviceLocationLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal?>("AccuracyMeters")
-                        .HasColumnType("decimal(10,2)");
-
-                    b.Property<DateTimeOffset>("CapturedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("DeviceId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<decimal>("Latitude")
-                        .HasColumnType("decimal(9,6)");
-
-                    b.Property<decimal>("Longitude")
-                        .HasColumnType("decimal(9,6)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CapturedAtUtc");
-
-                    b.HasIndex("DeviceId");
-
-                    b.ToTable("DeviceLocationLogs", (string)null);
                 });
 
             modelBuilder.Entity("Api.Domain.Entities.DevicePreference", b =>
@@ -557,6 +518,9 @@ namespace Api.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<Guid?>("LastScannedStallId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("QrRawResult")
                         .IsRequired()
                         .HasMaxLength(2048)
@@ -772,17 +736,6 @@ namespace Api.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<string>("TtsError")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<string>("TtsStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)")
-                        .HasDefaultValue("None");
-
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -792,74 +745,7 @@ namespace Api.Migrations
 
                     b.HasIndex("StallId");
 
-                    b.HasIndex("TtsStatus");
-
                     b.ToTable("StallNarrationContents", (string)null);
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.SubscriptionOrder", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,0)");
-
-                    b.Property<Guid>("BusinessId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("CardLastFour")
-                        .HasMaxLength(4)
-                        .HasColumnType("nvarchar(4)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset(3)")
-                        .HasDefaultValueSql("SYSUTCDATETIME()");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(3)
-                        .HasColumnType("nvarchar(3)")
-                        .HasDefaultValue("VND");
-
-                    b.Property<int>("DurationMonths")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset?>("PaidAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("PaymentMethod")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)")
-                        .HasDefaultValue("MockCard");
-
-                    b.Property<string>("Plan")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.Property<DateTimeOffset>("PlanEndAt")
-                        .HasColumnType("datetimeoffset(3)");
-
-                    b.Property<DateTimeOffset>("PlanStartAt")
-                        .HasColumnType("datetimeoffset(3)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("nvarchar(16)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BusinessId");
-
-                    b.ToTable("SubscriptionOrders", (string)null);
                 });
 
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>
@@ -1690,17 +1576,6 @@ namespace Api.Migrations
                     b.Navigation("Language");
 
                     b.Navigation("Stall");
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.SubscriptionOrder", b =>
-                {
-                    b.HasOne("Api.Domain.Entities.Business", "Business")
-                        .WithMany()
-                        .HasForeignKey("BusinessId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Business");
                 });
 
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>
