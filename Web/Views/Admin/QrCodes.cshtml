@@ -120,14 +120,11 @@
     .form-control:focus, .form-select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,150,78,0.1); outline: none; }
     .form-text { font-size: 12px; color: var(--text-light); margin-top: 4px; }
 
-    /* QR image preview modal */
-    .qr-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 8px 0; }
-    .qr-preview-wrap img { width: 220px; height: 220px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; padding: 10px; }
-    .qr-preview-code { font-family: monospace; font-size: 12px; color: var(--text-light); word-break: break-all; text-align: center; max-width: 260px; }
-    .qr-preview-note { font-size: 13px; color: var(--text-mid); font-style: italic; }
-    .qr-loading { width: 220px; height: 220px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
-    .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.7s linear infinite; }
-    @@keyframes spin { to { transform: rotate(360deg); } }
+    /* QR preview modal */
+    .qr-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0; }
+    #qrCanvas img, #qrCanvas canvas { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; background: #fff; }
+    .qr-preview-code { font-family: monospace; font-size: 13px; color: var(--navy); font-weight: 600; letter-spacing: 0.08em; text-align: center; background: var(--cream-dark); padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+    .qr-preview-note { font-size: 13px; color: var(--text-mid); font-style: italic; text-align: center; }
 
     /* Empty state */
     .empty-state { text-align: center; padding: 56px 20px; color: var(--text-light); }
@@ -350,23 +347,36 @@
                                 }
                             </td>
                             <td class="text-end" style="white-space:nowrap;">
-                                <!-- View QR image -->
+                                <!-- Xem QR -->
                                 <button type="button"
                                         class="btn btn-sm btn-outline-secondary btn-action"
-                                        title="Xem ảnh QR"
-                                        onclick="openQrImage('@q.Id', '@q.Code', @Json.Serialize(q.Note ?? ""))">
+                                        title="Xem mã QR"
+                                        onclick="openQrModal(@Json.Serialize(q.Id.ToString()), @Json.Serialize(q.Code), @Json.Serialize(q.Note ?? ""))">
                                     <i class="bi bi-qr-code-scan"></i>
                                 </button>
-                                <!-- Download -->
-                                <a asp-action="GetQrImage" asp-route-id="@q.Id"
+                                <!-- Tải ảnh -->
+                                <a asp-action="DownloadQrImage" asp-route-id="@q.Id"
                                    class="btn btn-sm btn-outline-primary btn-action"
-                                   title="Tải ảnh QR"
-                                   download="qr-@(q.Id.ToString()[..8]).png">
+                                   title="Tải ảnh QR">
                                     <i class="bi bi-download"></i>
                                 </a>
-                                <!-- Delete -->
                                 @if (!q.IsUsed)
                                 {
+                                    <!-- Đánh dấu đã dùng -->
+                                    <form asp-action="MarkQrUsed" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id"       value="@q.Id" />
+                                        <input type="hidden" name="code"     value="@q.Code" />
+                                        <input type="hidden" name="page"     value="@Model.Page" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        <button type="submit"
+                                                class="btn btn-sm btn-outline-success btn-action"
+                                                title="Đánh dấu đã sử dụng"
+                                                onclick="return confirm('Đánh dấu mã QR này là đã sử dụng?')">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                    </form>
+                                    <!-- Xoá -->
                                     <form asp-action="DeleteQrCode" method="post" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="id"       value="@q.Id" />
@@ -382,6 +392,9 @@
                                 }
                                 else
                                 {
+                                    <button class="btn btn-sm btn-outline-success btn-action" disabled title="Đã sử dụng">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    </button>
                                     <button class="btn btn-sm btn-outline-danger btn-action" disabled title="Không thể xoá mã đã dùng">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -490,29 +503,25 @@
     </div>
 </div>
 
-<!-- QR Image Preview Modal -->
+<!-- QR Preview Modal -->
 <div class="modal fade" id="qrImageModal" tabindex="-1" aria-labelledby="qrImageModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="qrImageModalLabel">
-                    <i class="bi bi-qr-code"></i>Ảnh mã QR
+                    <i class="bi bi-qr-code"></i>Mã QR
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="qr-preview-wrap">
-                    <div class="qr-loading" id="qrLoadingSpinner">
-                        <div class="spinner"></div>
-                    </div>
-                    <img id="qrPreviewImg" src="" alt="QR Code" style="display:none;"
-                         onerror="this.style.display='none';document.getElementById('qrLoadingSpinner').innerHTML='<span style=\'color:#a2493a;font-size:13px;\'>Không tải được ảnh.</span>';" />
+                    <div id="qrCanvas" style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;"></div>
                     <div class="qr-preview-code" id="qrPreviewCode"></div>
                     <div class="qr-preview-note" id="qrPreviewNote"></div>
                 </div>
             </div>
             <div class="modal-footer">
-                <a id="qrDownloadLink" class="btn btn-outline-primary btn-sm" download>
+                <a id="qrDownloadLink" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-download"></i> Tải xuống
                 </a>
                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
@@ -522,39 +531,42 @@
 </div>
 
 @section Scripts {
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-    function openQrImage(id, code, note) {
-        const img      = document.getElementById('qrPreviewImg');
-        const spinner  = document.getElementById('qrLoadingSpinner');
+    let _qrInstance = null;
+
+    function openQrModal(id, code, note) {
+        const canvas   = document.getElementById('qrCanvas');
         const codeEl   = document.getElementById('qrPreviewCode');
         const noteEl   = document.getElementById('qrPreviewNote');
         const dlLink   = document.getElementById('qrDownloadLink');
 
-        // Reset
-        img.style.display = 'none';
-        spinner.style.display = 'flex';
-        spinner.innerHTML = '<div class="spinner"></div>';
+        // Xoá QR cũ
+        canvas.innerHTML = '';
+        _qrInstance = null;
+
         codeEl.textContent = code;
         noteEl.textContent = note || '';
-        dlLink.href = `/Admin/GetQrImage/${id}`;
-        dlLink.setAttribute('download', `qr-${id.substring(0, 8)}.png`);
+        dlLink.href = `/Admin/DownloadQrImage/${id}`;
 
-        // Load image
-        const src = `/Admin/GetQrImage/${id}`;
-        img.onload = () => {
-            spinner.style.display = 'none';
-            img.style.display = 'block';
-        };
-        img.src = src;
+        // Render QR code client-side từ code string
+        _qrInstance = new QRCode(canvas, {
+            text: code,
+            width: 200,
+            height: 200,
+            colorDark: '#1e2d40',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.Q
+        });
 
-        new bootstrap.Modal(document.getElementById('qrImageModal')).show();
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('qrImageModal')).show();
     }
 
     // Auto-open create modal on validation fail
     @if (Model.ShowCreateModal)
     {
         <text>document.addEventListener('DOMContentLoaded', function() {
-            new bootstrap.Modal(document.getElementById('createQrModal')).show();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('createQrModal')).show();
         });</text>
     }
 </script>
