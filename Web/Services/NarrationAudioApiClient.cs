@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Shared.DTOs.Common;
 using Shared.DTOs.Narrations;
@@ -13,21 +14,58 @@ namespace Web.Services
             _httpClient = httpClient;
         }
 
-        public async Task<ApiResult<PagedResult<NarrationAudioDetailDto>>?> GetAudiosAsync(int page, int pageSize, Guid? narrationContentId, Guid? stallId, CancellationToken cancellationToken = default)
+        public async Task<ApiResult<NarrationAudioDetailDto>?> UploadHumanAudioAsync(
+            Guid audioId, IFormFile audioFile, CancellationToken cancellationToken = default)
         {
-            var url = $"api/narration-audio?page={page}&pageSize={pageSize}";
+            using var content = new MultipartFormDataContent();
+            await using var stream = audioFile.OpenReadStream();
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(audioFile.ContentType);
+            content.Add(fileContent, "audioFile", audioFile.FileName);
 
-            if (narrationContentId.HasValue)
+            var response = await _httpClient.PutAsync($"api/narration-audio/{audioId}/upload", content, cancellationToken);
+            return await ReadApiResultAsync<NarrationAudioDetailDto>(response, "Cập nhật audio thất bại.", cancellationToken);
+        }
+
+        private static async Task<ApiResult<T>?> ReadApiResultAsync<T>(HttpResponseMessage response, string fallbackMessage, CancellationToken cancellationToken)
+        {
+            try
             {
-                url += $"&narrationContentId={narrationContentId.Value}";
+                var result = await response.Content.ReadFromJsonAsync<ApiResult<T>>(cancellationToken: cancellationToken);
+                if (result != null)
+                    return result;
+            }
+            catch (NotSupportedException) { }
+            catch (System.Text.Json.JsonException) { }
+
+            if (response.IsSuccessStatusCode)
+            {
+                return ApiResult<T>.FromError(new ErrorDetail
+                {
+                    Code = ErrorCode.ServerError,
+                    Message = fallbackMessage
+                });
             }
 
-            if (stallId.HasValue)
+            var message = response.ReasonPhrase ?? fallbackMessage;
+            return ApiResult<T>.FromError(new ErrorDetail
             {
-                url += $"&stallId={stallId.Value}";
-            }
+                Code = MapStatusCode(response.StatusCode),
+                Message = message
+            });
+        }
 
-            return await _httpClient.GetFromJsonAsync<ApiResult<PagedResult<NarrationAudioDetailDto>>>(url, cancellationToken);
+        private static ErrorCode MapStatusCode(HttpStatusCode statusCode)
+        {
+            return statusCode switch
+            {
+                HttpStatusCode.BadRequest => ErrorCode.Validation,
+                HttpStatusCode.Unauthorized => ErrorCode.Unauthorized,
+                HttpStatusCode.Forbidden => ErrorCode.Forbidden,
+                HttpStatusCode.NotFound => ErrorCode.NotFound,
+                HttpStatusCode.Conflict => ErrorCode.Conflict,
+                _ => ErrorCode.ServerError
+            };
         }
     }
 }
