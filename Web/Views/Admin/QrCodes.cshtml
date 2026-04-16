@@ -1,0 +1,561 @@
+@model Web.Models.AdminQrCodesViewModel
+@{
+    ViewData["Title"] = "QR Codes";
+    var now        = DateTime.UtcNow;
+    var totalUnused = Model.TotalCount - Model.TotalUsed;
+    var startIndex  = Model.TotalCount == 0 ? 0 : ((Model.Page - 1) * Model.PageSize) + 1;
+    var endIndex    = Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
+}
+
+@section Styles {
+<style>
+    :root {
+        --cream: #f7f3ed; --cream-dark: #ede8df; --ivory: #faf8f4;
+        --navy: #1e2d40; --navy-mid: #2c3e55; --navy-light: #3d5068;
+        --gold: #b8964e; --gold-light: #d4ae6a; --gold-pale: #f0e4c8;
+        --text-dark: #1e2d40; --text-mid: #4a5568; --text-light: #718096;
+        --border: #d9cfc2;
+        --shadow-sm: 0 1px 4px rgba(30,45,64,0.07);
+        --shadow-md: 0 4px 16px rgba(30,45,64,0.10);
+        --shadow-lg: 0 8px 32px rgba(30,45,64,0.13);
+        --radius: 10px; --radius-sm: 6px;
+    }
+
+    .breadcrumb { background: transparent; padding: 0 0 12px; margin-bottom: 20px; font-size: 13px; }
+    .breadcrumb-item a { color: var(--text-mid); text-decoration: none; transition: color 0.15s; }
+    .breadcrumb-item a:hover { color: var(--gold); }
+    .breadcrumb-item.active { color: var(--text-light); }
+    .breadcrumb-item + .breadcrumb-item::before { color: var(--border); }
+
+    /* Header */
+    .page-header {
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+        border-radius: var(--radius); padding: 32px 40px; margin-bottom: 28px;
+        display: flex; justify-content: space-between; align-items: center;
+        flex-wrap: wrap; gap: 20px; box-shadow: var(--shadow-md);
+        position: relative; overflow: hidden;
+    }
+    .page-header::before { content: ''; position: absolute; top: -20px; right: -20px; width: 160px; height: 160px; border-radius: 50%; background: rgba(184,150,78,0.08); pointer-events: none; }
+    .page-header-content { position: relative; z-index: 1; }
+    .page-header h1 { font-size: 2rem; font-weight: 700; color: var(--cream); margin: 0 0 8px; display: flex; align-items: center; gap: 12px; }
+    .page-header h1 i { color: var(--gold-light); }
+    .page-header .lead { font-size: 14px; color: rgba(247,243,237,0.7); margin: 0; }
+    .page-header-actions { position: relative; z-index: 1; }
+    .btn-gold { background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: var(--navy); border: none; font-weight: 600; font-size: 13.5px; padding: 10px 22px; border-radius: var(--radius-sm); box-shadow: 0 2px 10px rgba(184,150,78,0.3); display: inline-flex; align-items: center; gap: 7px; cursor: pointer; transition: all 0.2s; }
+    .btn-gold:hover { box-shadow: 0 4px 16px rgba(184,150,78,0.4); transform: translateY(-1px); color: var(--navy); }
+
+    /* Stat cards */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--ivory); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 14px; }
+    .stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-icon i { font-size: 20px; }
+    .stat-icon.total   { background: rgba(30,45,64,0.08);   } .stat-icon.total i   { color: var(--navy); }
+    .stat-icon.used    { background: rgba(58,125,79,0.10);  } .stat-icon.used i    { color: #3a7d4f; }
+    .stat-icon.unused  { background: rgba(184,150,78,0.12); } .stat-icon.unused i  { color: var(--gold); }
+    .stat-icon.expired { background: rgba(162,73,58,0.09);  } .stat-icon.expired i { color: #a2493a; }
+    .stat-number { font-size: 1.7rem; font-weight: 700; color: var(--text-dark); line-height: 1; }
+    .stat-label  { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-light); margin-top: 3px; }
+
+    /* Table card */
+    .table-card { background: var(--ivory); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .table-card-header { background: var(--cream-dark); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; border-radius: var(--radius) var(--radius) 0 0; font-size: 13.5px; flex-wrap: wrap; gap: 10px; }
+    .table-card-footer { background: var(--cream-dark); border-top: 1px solid var(--border); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-radius: 0 0 var(--radius) var(--radius); }
+    .table { margin: 0; font-size: 13.5px; }
+    .table thead { background: var(--cream-dark); }
+    .table thead th { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-mid); border-bottom: 2px solid var(--border); padding: 12px 16px; white-space: nowrap; }
+    .table tbody td { padding: 13px 16px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+    .table tbody tr { background: #fff; transition: background 0.15s; }
+    .table tbody tr:hover { background: var(--cream); }
+    .table tbody tr:last-child td { border-bottom: none; }
+    .table tbody tr.row-used { opacity: 0.65; }
+
+    /* QR code field */
+    .qr-code-text { font-family: monospace; font-size: 12px; background: var(--cream-dark); padding: 3px 9px; border-radius: 4px; color: var(--navy-light); letter-spacing: 0.06em; word-break: break-all; }
+
+    /* Status badges */
+    .badge-used     { background: rgba(58,125,79,0.10);  color: #3a7d4f; border: 1px solid rgba(58,125,79,0.25);  padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .badge-unused   { background: rgba(184,150,78,0.10); color: #7a5c1e; border: 1px solid rgba(184,150,78,0.28); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .badge-expired  { background: rgba(162,73,58,0.09);  color: #a2493a; border: 1px solid rgba(162,73,58,0.22); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+    /* Date */
+    .date-main { font-size: 13px; color: var(--text-dark); }
+    .date-sub  { font-size: 11.5px; color: var(--text-light); }
+    .expiry-ok     { color: #3a7d4f; }
+    .expiry-soon   { color: #8b6e2f; font-weight: 600; }
+    .expiry-passed { color: #a2493a; }
+
+    /* Note */
+    .note-text { font-size: 12.5px; color: var(--text-mid); font-style: italic; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Filter strip */
+    .filter-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .filter-btn { font-size: 12px; padding: 5px 13px; border-radius: 20px; border: 1.5px solid var(--border); background: #fff; color: var(--text-mid); cursor: pointer; text-decoration: none; transition: all 0.18s; font-weight: 500; }
+    .filter-btn:hover, .filter-btn.active { border-color: var(--gold); background: var(--gold-pale); color: var(--navy); }
+
+    /* Page size select */
+    .page-size-select { font-size: 12.5px; padding: 5px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; color: var(--text-dark); cursor: pointer; }
+
+    /* Action buttons */
+    .btn-action { padding: 5px 9px; font-size: 13px; border-radius: var(--radius-sm); transition: all 0.18s; }
+    .btn-action:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+
+    /* Pagination */
+    .pagination { gap: 4px; }
+    .pagination .page-link { border: 1px solid var(--border); color: var(--text-dark); padding: 6px 12px; font-size: 13px; border-radius: var(--radius-sm); transition: all 0.18s; }
+    .pagination .page-link:hover { background: var(--gold-pale); border-color: var(--gold); color: var(--navy); }
+    .pagination .page-item.active .page-link { background: var(--gold); border-color: var(--gold); color: var(--navy); font-weight: 600; }
+    .pagination .page-item.disabled .page-link { background: var(--cream); border-color: var(--border); color: var(--text-light); pointer-events: none; }
+
+    /* Modal */
+    .modal-content { border: none; border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+    .modal-header { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; padding: 20px 24px; }
+    .modal-header .modal-title { font-size: 17px; font-weight: 700; color: var(--cream); display: flex; align-items: center; gap: 10px; }
+    .modal-header .modal-title i { color: var(--gold-light); }
+    .modal-header .btn-close { filter: brightness(0) invert(1); opacity: 0.7; }
+    .modal-header .btn-close:hover { opacity: 1; }
+    .modal-body { padding: 26px 24px; background: var(--ivory); }
+    .modal-footer { background: var(--cream-dark); border-top: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); padding: 14px 24px; }
+    .form-label { font-size: 13px; font-weight: 600; color: var(--text-dark); margin-bottom: 6px; }
+    .form-control, .form-select { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 13px; font-size: 13.5px; color: var(--text-dark); background: #fff; transition: all 0.2s; }
+    .form-control:focus, .form-select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,150,78,0.1); outline: none; }
+    .form-text { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+
+    /* QR image preview modal */
+    .qr-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 8px 0; }
+    .qr-preview-wrap img { width: 220px; height: 220px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; padding: 10px; }
+    .qr-preview-code { font-family: monospace; font-size: 12px; color: var(--text-light); word-break: break-all; text-align: center; max-width: 260px; }
+    .qr-preview-note { font-size: 13px; color: var(--text-mid); font-style: italic; }
+    .qr-loading { width: 220px; height: 220px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; }
+    .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @@keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 56px 20px; color: var(--text-light); }
+    .empty-state i { font-size: 44px; margin-bottom: 12px; display: block; opacity: 0.45; }
+    .empty-state p { font-size: 13.5px; margin: 0; }
+
+    .text-danger { color: #a2493a !important; }
+
+    @@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .anim-1 { animation: fadeUp 0.4s ease 0.05s both; }
+    .anim-2 { animation: fadeUp 0.4s ease 0.10s both; }
+    .anim-3 { animation: fadeUp 0.4s ease 0.15s both; }
+    .anim-4 { animation: fadeUp 0.4s ease 0.20s both; }
+
+    @@media (max-width: 992px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    @@media (max-width: 576px) {
+        .page-header { padding: 24px 20px; }
+        .page-header h1 { font-size: 1.5rem; }
+        .page-header-actions { width: 100%; }
+        .stats-row { grid-template-columns: 1fr 1fr; }
+    }
+</style>
+}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+        <li class="breadcrumb-item"><a asp-controller="Admin" asp-action="Dashboard">Admin</a></li>
+        <li class="breadcrumb-item active" aria-current="page">QR Codes</li>
+    </ol>
+</nav>
+
+<!-- Page Header -->
+<div class="page-header anim-1">
+    <div class="page-header-content">
+        <h1><i class="bi bi-qr-code"></i>QR Codes</h1>
+        <p class="lead">Tạo và quản lý mã QR dùng một lần để xác thực khách tham quan.</p>
+    </div>
+    <div class="page-header-actions">
+        <button type="button" class="btn-gold" data-bs-toggle="modal" data-bs-target="#createQrModal">
+            <i class="bi bi-plus-circle"></i>Tạo mã QR mới
+        </button>
+    </div>
+</div>
+
+<!-- Alerts -->
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show anim-1" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@Model.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show anim-1" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Stat Cards -->
+@{
+    var totalExpired = Model.Items.Count(q => !q.IsUsed && q.ExpiryAt < now);
+}
+<div class="stats-row anim-2">
+    <div class="stat-card">
+        <div class="stat-icon total"><i class="bi bi-qr-code"></i></div>
+        <div>
+            <div class="stat-number">@Model.TotalCount</div>
+            <div class="stat-label">Tổng mã QR</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon used"><i class="bi bi-check-circle"></i></div>
+        <div>
+            <div class="stat-number">@Model.TotalUsed</div>
+            <div class="stat-label">Đã sử dụng</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon unused"><i class="bi bi-hourglass-split"></i></div>
+        <div>
+            <div class="stat-number">@totalUnused</div>
+            <div class="stat-label">Chưa sử dụng</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon expired"><i class="bi bi-clock-history"></i></div>
+        <div>
+            <div class="stat-number">@totalExpired</div>
+            <div class="stat-label">Đã hết hạn</div>
+        </div>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="table-card anim-3">
+    <div class="table-card-header">
+        <!-- Filter strip -->
+        <div class="filter-strip">
+            <span style="font-size:12.5px;color:var(--text-light);font-weight:600;">Lọc:</span>
+            <a asp-action="QrCodes" asp-route-page="1" asp-route-pageSize="@Model.PageSize"
+               class="filter-btn @(ViewContext.HttpContext.Request.Query.ContainsKey("isUsed") == false ? "active" : "")">
+                Tất cả
+            </a>
+            <a asp-action="QrCodes" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-isUsed="false"
+               class="filter-btn @(ViewContext.HttpContext.Request.Query["isUsed"] == "false" ? "active" : "")">
+                Chưa dùng
+            </a>
+            <a asp-action="QrCodes" asp-route-page="1" asp-route-pageSize="@Model.PageSize" asp-route-isUsed="true"
+               class="filter-btn @(ViewContext.HttpContext.Request.Query["isUsed"] == "true" ? "active" : "")">
+                Đã dùng
+            </a>
+        </div>
+        <!-- Page size -->
+        <form method="get" asp-action="QrCodes" class="d-flex align-items-center gap-2">
+            <input type="hidden" name="page" value="1" />
+            <label style="font-size:12.5px;color:var(--text-light);white-space:nowrap;">Dòng / trang:</label>
+            <select name="pageSize" class="page-size-select" onchange="this.form.submit()">
+                @foreach (var s in new[] { 10, 20, 50, 100 })
+                {
+                    <option value="@s" selected="@(Model.PageSize == s ? "selected" : null)">@s</option>
+                }
+            </select>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table" aria-label="QR Codes list">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Mã QR</th>
+                    <th>Ghi chú</th>
+                    <th>Trạng thái</th>
+                    <th>Hạn sử dụng</th>
+                    <th>Ngày tạo</th>
+                    <th>Dùng lúc</th>
+                    <th class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                <i class="bi bi-qr-code"></i>
+                                <p>Chưa có mã QR nào.</p>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    var rowNum = startIndex;
+                    foreach (var q in Model.Items)
+                    {
+                        var isExpired  = !q.IsUsed && q.ExpiryAt < now;
+                        var isSoon     = !q.IsUsed && !isExpired && q.ExpiryAt < now.AddDays(3);
+                        var expiryCls  = isExpired ? "expiry-passed" : isSoon ? "expiry-soon" : "expiry-ok";
+                        var rowCls     = q.IsUsed ? "row-used" : "";
+
+                        <tr class="@rowCls">
+                            <td style="color:var(--text-light);font-size:12.5px;">@rowNum</td>
+                            <td>
+                                <span class="qr-code-text" title="@q.Code">
+                                    @(q.Code.Length > 16 ? q.Code[..8] + "…" + q.Code[^4..] : q.Code)
+                                </span>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(q.Note))
+                                {
+                                    <span class="note-text" title="@q.Note">@q.Note</span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-light);font-size:12.5px;">—</span>
+                                }
+                            </td>
+                            <td>
+                                @if (q.IsUsed)
+                                {
+                                    <span class="badge-used"><i class="bi bi-check-circle-fill me-1"></i>Đã dùng</span>
+                                }
+                                else if (isExpired)
+                                {
+                                    <span class="badge-expired"><i class="bi bi-x-circle-fill me-1"></i>Hết hạn</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-unused"><i class="bi bi-hourglass-split me-1"></i>Chưa dùng</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="date-main @expiryCls">
+                                    @q.ExpiryAt.ToLocalTime().ToString("dd/MM/yyyy")
+                                </div>
+                                <div class="date-sub @expiryCls">
+                                    @q.ExpiryAt.ToLocalTime().ToString("HH:mm")
+                                    @if (isSoon) { <text> · Sắp hết</text> }
+                                    @if (isExpired) { <text> · Đã hết</text> }
+                                </div>
+                            </td>
+                            <td>
+                                <div class="date-main">@q.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                <div class="date-sub">@q.CreatedAt.ToLocalTime().ToString("HH:mm")</div>
+                            </td>
+                            <td>
+                                @if (q.UsedAt.HasValue)
+                                {
+                                    <div class="date-main">@q.UsedAt.Value.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                    <div class="date-sub">@q.UsedAt.Value.ToLocalTime().ToString("HH:mm")</div>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--text-light);font-size:12.5px;">—</span>
+                                }
+                            </td>
+                            <td class="text-end" style="white-space:nowrap;">
+                                <!-- View QR image -->
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary btn-action"
+                                        title="Xem ảnh QR"
+                                        onclick="openQrImage('@q.Id', '@q.Code', '@Html.Raw(q.Note ?? "")')">
+                                    <i class="bi bi-qr-code-scan"></i>
+                                </button>
+                                <!-- Download -->
+                                <a asp-action="GetQrImage" asp-route-id="@q.Id"
+                                   class="btn btn-sm btn-outline-primary btn-action"
+                                   title="Tải ảnh QR"
+                                   download="qr-@(q.Id.ToString()[..8]).png">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                                <!-- Delete -->
+                                @if (!q.IsUsed)
+                                {
+                                    <form asp-action="DeleteQrCode" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id"       value="@q.Id" />
+                                        <input type="hidden" name="page"     value="@Model.Page" />
+                                        <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                                        <button type="submit"
+                                                class="btn btn-sm btn-outline-danger btn-action"
+                                                title="Xoá mã QR"
+                                                onclick="return confirm('Xoá mã QR này?')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-danger btn-action" disabled title="Không thể xoá mã đã dùng">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                        rowNum++;
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.TotalCount > 0)
+    {
+        <div class="table-card-footer">
+            <span style="font-size:13px;color:var(--text-light);">
+                Hiển thị @startIndex–@endIndex / @Model.TotalCount mã QR
+            </span>
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="QR pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-action="QrCodes"
+                               asp-route-page="@(Model.Page - 1)"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-isUsed="@Model.IsUsedFilter"
+                               asp-route-expired="@Model.ExpiredFilter">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        @for (int p = Math.Max(1, Model.Page - 2); p <= Math.Min(Model.TotalPages, Model.Page + 2); p++)
+                        {
+                            <li class="page-item @(p == Model.Page ? "active" : "")">
+                                <a class="page-link"
+                                   asp-action="QrCodes"
+                                   asp-route-page="@p"
+                                   asp-route-pageSize="@Model.PageSize"
+                                   asp-route-isUsed="@Model.IsUsedFilter"
+                                   asp-route-expired="@Model.ExpiredFilter">@p</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-action="QrCodes"
+                               asp-route-page="@(Model.Page + 1)"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-isUsed="@Model.IsUsedFilter"
+                               asp-route-expired="@Model.ExpiredFilter">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    }
+</div>
+
+<!-- Create QR Modal -->
+<div class="modal fade" id="createQrModal" tabindex="-1" aria-labelledby="createQrModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createQrModalLabel">
+                    <i class="bi bi-qr-code-scan"></i>Tạo mã QR mới
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="CreateQrCode" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="page"     value="@Model.Page" />
+                <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Hạn sử dụng <span class="text-danger">*</span></label>
+                        <input type="datetime-local"
+                               name="ExpiryAt"
+                               class="form-control"
+                               value="@(Model.Create.ExpiryAt > DateTime.MinValue ? Model.Create.ExpiryAt.ToString("yyyy-MM-ddTHH:mm") : DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-ddTHH:mm"))"
+                               min="@DateTime.UtcNow.AddMinutes(1).ToString("yyyy-MM-ddTHH:mm")"
+                               required />
+                        <div class="form-text">Thời điểm mã hết hiệu lực.</div>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label">Ghi chú</label>
+                        <input type="text"
+                               name="Note"
+                               class="form-control"
+                               placeholder="Ví dụ: Sự kiện ngày 20/4..."
+                               maxlength="200"
+                               value="@Model.Create.Note" />
+                        <div class="form-text">Tuỳ chọn, tối đa 200 ký tự.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                    <button type="submit" class="btn-gold">
+                        <i class="bi bi-qr-code"></i>Tạo mã QR
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- QR Image Preview Modal -->
+<div class="modal fade" id="qrImageModal" tabindex="-1" aria-labelledby="qrImageModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrImageModalLabel">
+                    <i class="bi bi-qr-code"></i>Ảnh mã QR
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="qr-preview-wrap">
+                    <div class="qr-loading" id="qrLoadingSpinner">
+                        <div class="spinner"></div>
+                    </div>
+                    <img id="qrPreviewImg" src="" alt="QR Code" style="display:none;"
+                         onerror="this.style.display='none';document.getElementById('qrLoadingSpinner').innerHTML='<span style=\'color:#a2493a;font-size:13px;\'>Không tải được ảnh.</span>';" />
+                    <div class="qr-preview-code" id="qrPreviewCode"></div>
+                    <div class="qr-preview-note" id="qrPreviewNote"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a id="qrDownloadLink" class="btn btn-outline-primary btn-sm" download>
+                    <i class="bi bi-download"></i> Tải xuống
+                </a>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openQrImage(id, code, note) {
+        const img      = document.getElementById('qrPreviewImg');
+        const spinner  = document.getElementById('qrLoadingSpinner');
+        const codeEl   = document.getElementById('qrPreviewCode');
+        const noteEl   = document.getElementById('qrPreviewNote');
+        const dlLink   = document.getElementById('qrDownloadLink');
+
+        // Reset
+        img.style.display = 'none';
+        spinner.style.display = 'flex';
+        spinner.innerHTML = '<div class="spinner"></div>';
+        codeEl.textContent = code;
+        noteEl.textContent = note || '';
+        dlLink.href = `/Admin/GetQrImage/${id}`;
+        dlLink.setAttribute('download', `qr-${id.substring(0, 8)}.png`);
+
+        // Load image
+        const src = `/Admin/GetQrImage/${id}`;
+        img.onload = () => {
+            spinner.style.display = 'none';
+            img.style.display = 'block';
+        };
+        img.src = src;
+
+        new bootstrap.Modal(document.getElementById('qrImageModal')).show();
+    }
+
+    // Auto-open create modal on validation fail
+    @if (Model.ShowCreateModal)
+    {
+        <text>document.addEventListener('DOMContentLoaded', function() {
+            new bootstrap.Modal(document.getElementById('createQrModal')).show();
+        });</text>
+    }
+</script>
+}

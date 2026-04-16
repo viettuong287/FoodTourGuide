@@ -1,0 +1,529 @@
+@model Web.Models.SubscriptionManagementViewModel
+@{
+    ViewData["Title"] = "Subscription Management";
+    var startIndex = Model.TotalCount == 0 ? 0 : ((Model.Page - 1) * Model.PageSize) + 1;
+    var endIndex   = Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
+}
+
+@section Styles {
+<style>
+    :root {
+        --cream: #f7f3ed; --cream-dark: #ede8df; --ivory: #faf8f4;
+        --navy: #1e2d40; --navy-mid: #2c3e55; --navy-light: #3d5068;
+        --gold: #b8964e; --gold-light: #d4ae6a; --gold-pale: #f0e4c8;
+        --text-dark: #1e2d40; --text-mid: #4a5568; --text-light: #718096;
+        --border: #d9cfc2;
+        --shadow-sm: 0 1px 4px rgba(30,45,64,0.07);
+        --shadow-md: 0 4px 16px rgba(30,45,64,0.10);
+        --shadow-lg: 0 8px 32px rgba(30,45,64,0.13);
+        --radius: 10px; --radius-sm: 6px;
+    }
+
+    .breadcrumb { background: transparent; padding: 0 0 12px; margin-bottom: 20px; font-size: 13px; }
+    .breadcrumb-item a { color: var(--text-mid); text-decoration: none; transition: color 0.15s; }
+    .breadcrumb-item a:hover { color: var(--gold); }
+    .breadcrumb-item.active { color: var(--text-light); }
+    .breadcrumb-item + .breadcrumb-item::before { color: var(--border); }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+        border-radius: var(--radius); padding: 32px 40px; margin-bottom: 28px;
+        display: flex; justify-content: space-between; align-items: center;
+        flex-wrap: wrap; gap: 20px; box-shadow: var(--shadow-md);
+        position: relative; overflow: hidden;
+    }
+    .page-header::before { content: ''; position: absolute; top: -20px; right: -20px; width: 160px; height: 160px; border-radius: 50%; background: rgba(184,150,78,0.08); pointer-events: none; }
+    .page-header-content { position: relative; z-index: 1; }
+    .page-header h1 { font-size: 2rem; font-weight: 700; color: var(--cream); margin: 0 0 8px; display: flex; align-items: center; gap: 12px; }
+    .page-header h1 i { color: var(--gold-light); }
+    .page-header .lead { font-size: 14px; color: rgba(247,243,237,0.7); margin: 0; }
+
+    /* Plan pills */
+    .plan-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; padding: 4px 13px; border-radius: 20px; border: 1.5px solid; white-space: nowrap; letter-spacing: 0.02em; }
+    .plan-free       { background: rgba(113,128,150,0.09); color: #5c6b7c;   border-color: rgba(113,128,150,0.25); }
+    .plan-basic      { background: rgba(30,45,64,0.09);    color: var(--navy); border-color: rgba(30,45,64,0.22); }
+    .plan-pro        { background: rgba(184,150,78,0.13);  color: #7a5c1e;   border-color: rgba(184,150,78,0.35); }
+    .plan-enterprise { background: rgba(107,76,154,0.10);  color: #6b4c9a;   border-color: rgba(107,76,154,0.28); }
+
+    .badge-active   { background: rgba(58,125,79,0.12);  color: #3a7d4f; border: 1px solid rgba(58,125,79,0.25);  padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-inactive { background: rgba(162,73,58,0.10);  color: #a2493a; border: 1px solid rgba(162,73,58,0.20); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-expired  { background: rgba(184,150,78,0.10);  color: #8b6e2f; border: 1px solid rgba(184,150,78,0.28); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+    /* Expiry warning */
+    .expiry-ok      { color: #3a7d4f; font-size: 12.5px; }
+    .expiry-soon    { color: #8b6e2f; font-size: 12.5px; font-weight: 600; }
+    .expiry-expired { color: #a2493a; font-size: 12.5px; }
+
+    /* Search card */
+    .filter-card { background: var(--ivory); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 20px 24px; margin-bottom: 24px; }
+    .form-label { font-size: 13px; font-weight: 600; color: var(--text-dark); margin-bottom: 6px; }
+    .form-control, .form-select { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 14px; font-size: 14px; color: var(--text-dark); background: #fff; transition: all 0.2s ease; }
+    .form-control:focus, .form-select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,150,78,0.1); outline: none; }
+    .search-box { position: relative; }
+    .search-box .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-light); font-size: 14px; pointer-events: none; }
+    .search-box .form-control { padding-left: 38px; }
+
+    /* Table card */
+    .table-card { background: var(--ivory); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .table-card-header { background: var(--cream-dark); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; border-radius: var(--radius) var(--radius) 0 0; }
+    .table-card-footer { background: var(--cream-dark); border-top: 1px solid var(--border); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-radius: 0 0 var(--radius) var(--radius); }
+    .table { margin: 0; font-size: 13.5px; }
+    .table thead { background: var(--cream-dark); }
+    .table thead th { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-mid); border-bottom: 2px solid var(--border); padding: 12px 16px; white-space: nowrap; }
+    .table tbody td { padding: 15px 16px; vertical-align: middle; border-bottom: 1px solid var(--border); color: var(--text-dark); }
+    .table tbody tr { background: #fff; transition: background 0.15s; }
+    .table tbody tr:hover { background: var(--cream); }
+    .table tbody tr:last-child td { border-bottom: none; }
+
+    .biz-icon { width: 34px; height: 34px; border-radius: 8px; background: rgba(30,45,64,0.07); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .biz-icon i { font-size: 15px; color: var(--navy-light); }
+    .biz-name { font-weight: 600; font-size: 13.5px; color: var(--text-dark); }
+    .biz-email { font-size: 12px; color: var(--text-light); }
+
+    /* Buttons */
+    .btn-gold { background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: var(--navy); border: none; font-weight: 600; font-size: 13.5px; padding: 10px 22px; border-radius: var(--radius-sm); box-shadow: 0 2px 10px rgba(184,150,78,0.3); display: inline-flex; align-items: center; gap: 7px; cursor: pointer; transition: all 0.2s; }
+    .btn-gold:hover { box-shadow: 0 4px 16px rgba(184,150,78,0.4); transform: translateY(-1px); color: var(--navy); }
+    .btn-classic { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; letter-spacing: 0.03em; padding: 6px 13px; border-radius: var(--radius-sm); border: 1.5px solid; text-decoration: none; transition: all 0.18s; background: transparent; white-space: nowrap; cursor: pointer; }
+    .btn-classic.navy { border-color: var(--navy); color: var(--navy); }
+    .btn-classic.navy:hover { background: var(--navy); color: var(--cream); }
+    .btn-action { padding: 5px 10px; font-size: 13px; border-radius: var(--radius-sm); transition: all 0.18s; }
+    .btn-action:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+
+    /* Pagination */
+    .pagination { gap: 4px; }
+    .pagination .page-link { border: 1px solid var(--border); color: var(--text-dark); padding: 6px 12px; font-size: 13px; border-radius: var(--radius-sm); transition: all 0.18s; }
+    .pagination .page-link:hover { background: var(--gold-pale); border-color: var(--gold); color: var(--navy); }
+    .pagination .page-item.active .page-link { background: var(--gold); border-color: var(--gold); color: var(--navy); font-weight: 600; }
+    .pagination .page-item.disabled .page-link { background: var(--cream); border-color: var(--border); color: var(--text-light); pointer-events: none; }
+
+    /* Modal */
+    .modal-content { border: none; border-radius: var(--radius); box-shadow: var(--shadow-lg); }
+    .modal-header { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%); border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; padding: 20px 24px; }
+    .modal-header .modal-title { font-size: 18px; font-weight: 700; color: var(--cream); display: flex; align-items: center; gap: 10px; }
+    .modal-header .modal-title i { color: var(--gold-light); }
+    .modal-header .btn-close { filter: brightness(0) invert(1); opacity: 0.7; }
+    .modal-header .btn-close:hover { opacity: 1; }
+    .modal-body { padding: 28px 24px; background: var(--ivory); }
+    .modal-footer { background: var(--cream-dark); border-top: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); padding: 16px 24px; }
+
+    /* Plan selector cards inside modal */
+    .plan-select-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 4px; }
+    .plan-select-card { position: relative; }
+    .plan-select-card input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .plan-select-label {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 4px; padding: 14px 10px; border: 2px solid var(--border); border-radius: var(--radius-sm);
+        cursor: pointer; transition: all 0.2s; text-align: center; background: #fff;
+    }
+    .plan-select-label:hover { border-color: var(--gold); background: var(--gold-pale); }
+    .plan-select-card input[type="radio"]:checked + .plan-select-label { border-color: var(--gold); background: var(--gold-pale); box-shadow: 0 0 0 3px rgba(184,150,78,0.15); }
+    .plan-select-label .plan-name { font-weight: 700; font-size: 14px; color: var(--text-dark); }
+    .plan-select-label .plan-price { font-size: 12px; color: var(--text-light); }
+    .plan-select-label .plan-icon { font-size: 20px; margin-bottom: 2px; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-light); }
+    .empty-state i { font-size: 48px; margin-bottom: 12px; display: block; opacity: 0.45; }
+    .empty-state p { font-size: 13.5px; margin: 0; }
+
+    .validation-summary-valid { display: none !important; }
+    .text-danger { color: #a2493a !important; }
+
+    @@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .anim-1 { animation: fadeUp 0.4s ease 0.05s both; }
+    .anim-2 { animation: fadeUp 0.4s ease 0.10s both; }
+    .anim-3 { animation: fadeUp 0.4s ease 0.15s both; }
+
+    @@media (max-width: 576px) {
+        .page-header { padding: 24px 20px; }
+        .page-header h1 { font-size: 1.5rem; }
+        .plan-select-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+</style>
+}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+        <li class="breadcrumb-item"><a asp-controller="Admin" asp-action="Dashboard">Admin</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Subscription Management</li>
+    </ol>
+</nav>
+
+<!-- Page Header -->
+<div class="page-header anim-1">
+    <div class="page-header-content">
+        <h1><i class="bi bi-credit-card"></i>Subscription Management</h1>
+        <p class="lead">Quản lý và cập nhật gói đăng ký của các business trong hệ thống.</p>
+    </div>
+</div>
+
+<!-- Alerts -->
+@if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show anim-1" role="alert">
+        <i class="bi bi-check-circle me-2"></i>@Model.SuccessMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show anim-1" role="alert">
+        <i class="bi bi-exclamation-circle me-2"></i>@Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Search -->
+<div class="filter-card anim-2">
+    <form method="get" asp-action="Subscription" class="row g-3 align-items-end">
+        <div class="col-md-5">
+            <label class="form-label">Tìm kiếm Business</label>
+            <div class="search-box">
+                <i class="bi bi-search search-icon"></i>
+                <input type="text" class="form-control" name="search"
+                       value="@Model.Search" placeholder="Nhập tên business...">
+            </div>
+        </div>
+        <div class="col-auto d-flex gap-2">
+            <button type="submit" class="btn-classic navy"><i class="bi bi-funnel"></i>Tìm</button>
+            <a asp-action="Subscription" class="btn-classic navy"><i class="bi bi-x-circle"></i>Xoá lọc</a>
+        </div>
+    </form>
+</div>
+
+<!-- Table -->
+<div class="table-card anim-3">
+    <div class="table-card-header">
+        <span style="font-size:13.5px;">
+            <strong>@Model.TotalCount</strong> business
+            @if (!string.IsNullOrWhiteSpace(Model.Search))
+            {
+                <span class="text-muted"> — tìm "<em>@Model.Search</em>"</span>
+            }
+        </span>
+        <a asp-controller="Admin" asp-action="SubscriptionOrders" class="btn-classic navy" style="font-size:12px;">
+            <i class="bi bi-receipt"></i>Xem đơn hàng
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table" aria-label="Subscription list">
+            <thead>
+                <tr>
+                    <th>Business</th>
+                    <th>Liên hệ</th>
+                    <th>Gói hiện tại</th>
+                    <th>Hạn sử dụng</th>
+                    <th>Trạng thái</th>
+                    <th class="text-end">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Items.Count == 0)
+                {
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="bi bi-building-slash"></i>
+                                <p>Không tìm thấy business nào.</p>
+                                @if (!string.IsNullOrWhiteSpace(Model.Search))
+                                {
+                                    <p class="mt-1 text-muted" style="font-size:12px;">Thử từ khoá khác.</p>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var b in Model.Items)
+                    {
+                        var now = DateTimeOffset.UtcNow;
+                        var hasExpiry = b.PlanExpiresAt.HasValue;
+                        var isExpired = hasExpiry && b.PlanExpiresAt!.Value < now;
+                        var isSoon    = hasExpiry && !isExpired && b.PlanExpiresAt!.Value < now.AddDays(7);
+                        var planKey   = b.Plan?.ToLower() ?? "free";
+                        var planCls   = planKey switch {
+                            "pro"        => "plan-pro",
+                            "basic"      => "plan-basic",
+                            "enterprise" => "plan-enterprise",
+                            _            => "plan-free"
+                        };
+                        var planIcon = planKey switch {
+                            "pro"        => "bi-star-fill",
+                            "basic"      => "bi-shield-check",
+                            "enterprise" => "bi-building-check",
+                            _            => "bi-gift"
+                        };
+
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="biz-icon"><i class="bi bi-building"></i></div>
+                                    <div>
+                                        <div class="biz-name">@b.Name</div>
+                                        @if (!string.IsNullOrWhiteSpace(b.TaxCode))
+                                        {
+                                            <div class="biz-email">MST: @b.TaxCode</div>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(b.ContactEmail))
+                                {
+                                    <div style="font-size:13px;">@b.ContactEmail</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(b.ContactPhone))
+                                {
+                                    <div style="font-size:12px;color:var(--text-light);">@b.ContactPhone</div>
+                                }
+                                @if (string.IsNullOrWhiteSpace(b.ContactEmail) && string.IsNullOrWhiteSpace(b.ContactPhone))
+                                {
+                                    <span style="color:var(--text-light);font-size:13px;">—</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="plan-pill @planCls">
+                                    <i class="bi @planIcon"></i>@(b.Plan ?? "Free")
+                                </span>
+                            </td>
+                            <td>
+                                @if (!hasExpiry || planKey == "free")
+                                {
+                                    <span style="color:var(--text-light);font-size:13px;">—</span>
+                                }
+                                else if (isExpired)
+                                {
+                                    <span class="expiry-expired">
+                                        <i class="bi bi-x-circle-fill me-1"></i>Đã hết hạn
+                                        <br><small>@b.PlanExpiresAt!.Value.ToLocalTime().ToString("dd/MM/yyyy")</small>
+                                    </span>
+                                }
+                                else if (isSoon)
+                                {
+                                    <span class="expiry-soon">
+                                        <i class="bi bi-exclamation-circle-fill me-1"></i>Sắp hết hạn
+                                        <br><small>@b.PlanExpiresAt!.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</small>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="expiry-ok">
+                                        <i class="bi bi-check-circle me-1"></i>@b.PlanExpiresAt!.Value.ToLocalTime().ToString("dd/MM/yyyy")
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                @if (!b.IsActive)
+                                {
+                                    <span class="badge-inactive">Inactive</span>
+                                }
+                                else if (isExpired && planKey != "free")
+                                {
+                                    <span class="badge-expired">Hết hạn</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-active">Active</span>
+                                }
+                            </td>
+                            <td class="text-end" style="white-space:nowrap;">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-warning btn-action"
+                                        title="Cập nhật gói"
+                                        data-id="@b.Id"
+                                        data-name="@b.Name"
+                                        data-plan="@(b.Plan ?? "Free")"
+                                        data-expires="@(b.PlanExpiresAt?.ToString("yyyy-MM-ddTHH:mm") ?? "")"
+                                        onclick="openEditModal(this)">
+                                    <i class="bi bi-pencil-square"></i> Đổi gói
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.TotalCount > 0)
+    {
+        <div class="table-card-footer">
+            <span style="font-size:13px;color:var(--text-light);">
+                Hiển thị @startIndex–@endIndex / @Model.TotalCount business
+            </span>
+            @if (Model.TotalPages > 1)
+            {
+                <nav aria-label="Subscription pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-action="Subscription"
+                               asp-route-page="@(Model.Page - 1)"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.Search">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        @for (int p = Math.Max(1, Model.Page - 2); p <= Math.Min(Model.TotalPages, Model.Page + 2); p++)
+                        {
+                            <li class="page-item @(p == Model.Page ? "active" : "")">
+                                <a class="page-link"
+                                   asp-action="Subscription"
+                                   asp-route-page="@p"
+                                   asp-route-pageSize="@Model.PageSize"
+                                   asp-route-search="@Model.Search">@p</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
+                            <a class="page-link"
+                               asp-action="Subscription"
+                               asp-route-page="@(Model.Page + 1)"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.Search">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    }
+</div>
+
+<!-- Edit Subscription Modal -->
+<div class="modal fade" id="editSubModal" tabindex="-1" aria-labelledby="editSubModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editSubModalLabel">
+                    <i class="bi bi-credit-card"></i>Cập nhật gói — <span id="modalBizName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form asp-action="UpdateSubscription" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Edit.BusinessId" id="editBusinessId" />
+                <input type="hidden" asp-for="Edit.BusinessName" id="editBusinessName" />
+                <input type="hidden" name="page"     value="@Model.Page" />
+                <input type="hidden" name="pageSize" value="@Model.PageSize" />
+                <input type="hidden" name="search"   value="@Model.Search" />
+
+                <div class="modal-body">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <!-- Plan selector -->
+                    <div class="mb-4">
+                        <label class="form-label">Chọn gói <span class="text-danger">*</span></label>
+                        <div class="plan-select-grid">
+                            <div class="plan-select-card">
+                                <input type="radio" name="Edit.Plan" id="planFree" value="Free" />
+                                <label class="plan-select-label" for="planFree">
+                                    <i class="bi bi-gift plan-icon" style="color:var(--text-light);"></i>
+                                    <span class="plan-name">Free</span>
+                                    <span class="plan-price">0 ₫</span>
+                                </label>
+                            </div>
+                            <div class="plan-select-card">
+                                <input type="radio" name="Edit.Plan" id="planBasic" value="Basic" />
+                                <label class="plan-select-label" for="planBasic">
+                                    <i class="bi bi-shield-check plan-icon" style="color:var(--navy);"></i>
+                                    <span class="plan-name">Basic</span>
+                                    <span class="plan-price">199.000 ₫/tháng</span>
+                                </label>
+                            </div>
+                            <div class="plan-select-card">
+                                <input type="radio" name="Edit.Plan" id="planPro" value="Pro" />
+                                <label class="plan-select-label" for="planPro">
+                                    <i class="bi bi-star-fill plan-icon" style="color:var(--gold);"></i>
+                                    <span class="plan-name">Pro</span>
+                                    <span class="plan-price">499.000 ₫/tháng</span>
+                                </label>
+                            </div>
+                        </div>
+                        <span asp-validation-for="Edit.Plan" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Plan expires at -->
+                    <div id="expirySection">
+                        <label asp-for="Edit.PlanExpiresAt" class="form-label">Hạn sử dụng</label>
+                        <input asp-for="Edit.PlanExpiresAt"
+                               id="editPlanExpiresAt"
+                               type="datetime-local"
+                               class="form-control"
+                               style="max-width:260px;" />
+                        <div class="form-text" style="font-size:12px;color:var(--text-light);margin-top:4px;">
+                            Để trống nếu muốn dùng vĩnh viễn (chỉ áp dụng gói Free).
+                        </div>
+                        <span asp-validation-for="Edit.PlanExpiresAt" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+                    <button type="submit" class="btn-gold">
+                        <i class="bi bi-check-circle"></i>Lưu thay đổi
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function openEditModal(btn) {
+            const id      = btn.dataset.id;
+            const name    = btn.dataset.name;
+            const plan    = btn.dataset.plan || 'Free';
+            const expires = btn.dataset.expires || '';
+
+            document.getElementById('editBusinessId').value   = id;
+            document.getElementById('editBusinessName').value = name;
+            document.getElementById('modalBizName').textContent = name;
+            document.getElementById('editPlanExpiresAt').value = expires;
+
+            // Check radio tương ứng
+            const radio = document.getElementById(
+                plan === 'Pro' ? 'planPro' : plan === 'Basic' ? 'planBasic' : 'planFree'
+            );
+            if (radio) radio.checked = true;
+
+            new bootstrap.Modal(document.getElementById('editSubModal')).show();
+        }
+
+        // Khi trang load lại với ShowEditModal = true (validation fail)
+        @if (Model.ShowEditModal)
+        {
+            <text>
+            document.addEventListener('DOMContentLoaded', function() {
+                new bootstrap.Modal(document.getElementById('editSubModal')).show();
+                document.getElementById('editBusinessId').value   = '@Model.Edit.BusinessId';
+                document.getElementById('editBusinessName').value = '@Html.Raw(Model.Edit.BusinessName)';
+                document.getElementById('modalBizName').textContent = '@Html.Raw(Model.Edit.BusinessName)';
+
+                var radio = document.getElementById(
+                    '@Model.Edit.Plan' === 'Pro' ? 'planPro' : '@Model.Edit.Plan' === 'Basic' ? 'planBasic' : 'planFree'
+                );
+                if (radio) radio.checked = true;
+
+                @if (Model.Edit.PlanExpiresAt.HasValue)
+                {
+                    <text>
+                    document.getElementById('editPlanExpiresAt').value = '@Model.Edit.PlanExpiresAt.Value.ToString("yyyy-MM-ddTHH:mm")';
+                    </text>
+                }
+            });
+            </text>
+        }
+
+        // Tooltips
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('[title]').forEach(el => new bootstrap.Tooltip(el, { trigger: 'hover' }));
+        });
+    </script>
+}
