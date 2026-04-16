@@ -3,7 +3,12 @@
     "allow": [
       "Bash(xargs cat *)",
       "Bash(dotnet add *)",
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "Bash(grep -n \"Html.Raw\\\\|@Html.Raw\" /c/Users/Admin/source/repos/FoodTourGuide/Web/Views/**/*.cshtml)",
+      "Bash(grep -v \"//\")",
+      "Bash(ls -la /c/Users/Admin/source/repos/FoodTourGuide/Web/Controllers/*.cs)",
+      "Bash(grep -l \"class.*Controller.*:\" /c/Users/Admin/source/repos/FoodTourGuide/Web/Controllers/*.cs)",
+      "Bash(xargs head *)"
     ]
   }
 }
