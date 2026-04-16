@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VinhThucAudioGuide.HomePage"
+             Title="Trang chủ">
+
+    <VerticalStackLayout Spacing="20" Padding="20" VerticalOptions="Center" HorizontalOptions="Center">
+
+        <Label Text="Chào mừng đến với" FontSize="20" HorizontalOptions="Center" />
+        <Label Text="Vĩnh Thực Audio Guide" FontSize="28" FontAttributes="Bold" TextColor="DarkBlue" HorizontalOptions="Center" />
+        <Label Text="Phiên bản: v1.0.0" FontSize="14" TextColor="Gray" HorizontalOptions="Center" />
+
+        <Label Text="Ứng dụng hướng dẫn du lịch tự động qua GPS..." 
+               HorizontalTextAlignment="Center" Margin="0,20,0,20"/>
+
+        <Button x:Name="BtnGoToMap" 
+                Text="Khám phá Bản đồ ngay" 
+                BackgroundColor="DarkBlue" 
+                TextColor="White"
+                CornerRadius="10"
+                Clicked="BtnGoToMap_Clicked"/>
+
+    </VerticalStackLayout>
+</ContentPage>
