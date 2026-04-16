@@ -4,8 +4,12 @@
              x:Class="VinhThucAudioGuide.QrPage"
              Title="Mã QR">
 
-    <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center">
-        <Label Text="Đây là trang Quét Mã QR" FontSize="24" FontAttributes="Bold" />
+    <VerticalStackLayout Padding="30" Spacing="25" VerticalOptions="Center">
+        <Border Stroke="#0055CC" StrokeThickness="2" StrokeShape="RoundRectangle 20" Padding="40" BackgroundColor="#F0F8FF">
+            <Image Source="ic_qr.svg" HeightRequest="200" WidthRequest="200" />
+        </Border>
+        <Label Text="Quét mã QR tại điểm du lịch" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+        <Label Text="Hãy đưa camera lại gần mã QR để nghe thuyết minh chi tiết về địa danh này." 
+               HorizontalTextAlignment="Center" TextColor="Gray" />
     </VerticalStackLayout>
-
 </ContentPage>

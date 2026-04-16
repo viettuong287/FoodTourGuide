@@ -10,6 +10,14 @@ using System.Net.Http;
 using System.Text.Json;
 using Color = Microsoft.Maui.Graphics.Color;
 using Microsoft.Maui.ApplicationModel;
+using System;
+using System.Linq;
+using System.Threading;
+using Microsoft.Maui.Controls;           // Trị lỗi ContentPage, Button, SelectionChangedEventArgs
+using Microsoft.Maui.Graphics;           // Trị lỗi Colors
+using Microsoft.Maui.Devices.Sensors;    // Trị lỗi Location, Geolocation, GeolocationRequest
+using Microsoft.Maui.Storage;            // Dùng để đọc Preferences (Sổ tay cài đặt ngôn ngữ)
+using Microsoft.Maui.Media;
 
 namespace VinhThucAudioGuide
 {

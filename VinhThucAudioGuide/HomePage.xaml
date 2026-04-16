@@ -2,23 +2,19 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="VinhThucAudioGuide.HomePage"
-             Title="Trang chủ">
+             Title="Trang chủ"
+             BackgroundColor="#F5F7FA">
 
-    <VerticalStackLayout Spacing="20" Padding="20" VerticalOptions="Center" HorizontalOptions="Center">
+    <Grid RowDefinitions="3*, Auto, Auto, Auto, 2*, Auto" Padding="25">
+        <Image Grid.Row="0" Source="logo_app.svg" HeightRequest="200" VerticalOptions="Center" HorizontalOptions="Center" />
 
-        <Label Text="Chào mừng đến với" FontSize="20" HorizontalOptions="Center" />
-        <Label Text="Vĩnh Thực Audio Guide" FontSize="28" FontAttributes="Bold" TextColor="DarkBlue" HorizontalOptions="Center" />
-        <Label Text="Phiên bản: v1.0.0" FontSize="14" TextColor="Gray" HorizontalOptions="Center" />
+        <Label x:Name="LblTitle" Grid.Row="1" Text="Vĩnh Thực Audio Guide" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#0055CC"/>
+        <Label x:Name="LblDesc" Grid.Row="2" Text="Khám phá vẻ đẹp biển đảo qua từng câu chuyện kể tự động." 
+               HorizontalTextAlignment="Center" FontSize="16" TextColor="#4A4A4A" Margin="0,15,0,0" LineHeight="1.3"/>
+        <Label Grid.Row="3" Text="v1.0.0" FontSize="13" HorizontalOptions="Center" TextColor="Gray" Margin="0,10,0,0"/>
 
-        <Label Text="Ứng dụng hướng dẫn du lịch tự động qua GPS..." 
-               HorizontalTextAlignment="Center" Margin="0,20,0,20"/>
-
-        <Button x:Name="BtnGoToMap" 
-                Text="Khám phá Bản đồ ngay" 
-                BackgroundColor="DarkBlue" 
-                TextColor="White"
-                CornerRadius="10"
+        <Button Grid.Row="5" x:Name="BtnStart" Text="BẮT ĐẦU HÀNH TRÌNH" BackgroundColor="#0055CC" TextColor="White" 
+                FontAttributes="Bold" CornerRadius="15" HeightRequest="55" Margin="0,0,0,20"
                 Clicked="BtnGoToMap_Clicked"/>
-
-    </VerticalStackLayout>
+    </Grid>
 </ContentPage>

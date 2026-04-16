@@ -10,8 +10,9 @@
         <ResourceDictionary>
             <Style TargetType="TabBar">
                 <Setter Property="Shell.TabBarBackgroundColor" Value="White" />
-                <Setter Property="Shell.TabBarTitleColor" Value="Black" />
+                <Setter Property="Shell.TabBarTitleColor" Value="#0055CC" />
                 <Setter Property="Shell.TabBarUnselectedColor" Value="Gray" />
+                <Setter Property="Shell.ForegroundColor" Value="#0055CC" />
             </Style>
         </ResourceDictionary>
     </Shell.Resources>
@@ -33,5 +34,4 @@
             <ShellContent Route="SettingsPage" ContentTemplate="{DataTemplate local:SettingsPage}" />
         </Tab>
     </TabBar>
-
 </Shell>
