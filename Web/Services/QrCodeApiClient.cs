@@ -36,4 +36,13 @@ public class QrCodeApiClient(HttpClient httpClient)
         if (!response.IsSuccessStatusCode) return null;
         return await response.Content.ReadAsByteArrayAsync(ct);
     }
+
+    public async Task<bool> MarkQrUsedAsync(string code, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("api/qrcodes/verify",
+            new QrCodeVerifyRequestDto { Code = code, DeviceId = "admin-web" }, ct);
+        if (!response.IsSuccessStatusCode) return false;
+        var result = await response.Content.ReadFromJsonAsync<ApiResult<object?>>(cancellationToken: ct);
+        return result?.Success == true;
+    }
 }
