@@ -388,7 +388,7 @@
     var marker = null;
     var circle = null;
     var currentLocationId = '@(locationId?.ToString() ?? "")';
-    var allStallLocations = @Html.Raw(ViewBag.AllLocationsJson ?? "[]");
+    var allStallLocations = @Html.Raw(ViewBag.AllLocationsJson ?? "[]"); // safe: pre-serialized by JsonSerializer (encodes < > & by default)
     var otherMarkers = [];
 
     var selectedIcon = L.divIcon({
@@ -505,7 +505,7 @@
         if (!selectedStallId) { currentLocationId = ''; return; }
 
         var jwtToken = localStorage.getItem('jwtToken');
-        var base = '@Html.Raw(apiBaseUrl)'.replace(/\/$/, '');
+        var base = '@apiBaseUrl'.replace(/\/$/, '');
         fetch(base + '/api/stall-location?stallId=' + selectedStallId + '&pageSize=1', {
             headers: jwtToken ? { 'Authorization': 'Bearer ' + jwtToken } : {}
         })
@@ -567,7 +567,7 @@
         var submitBtn = $('#submitBtn');
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Saving...');
 
-        var base = '@Html.Raw(apiBaseUrl)'.replace(/\/$/, '');
+        var base = '@apiBaseUrl'.replace(/\/$/, '');
         var url = currentLocationId ? base + '/api/stall-location/' + currentLocationId : base + '/api/stall-location';
         var method = currentLocationId ? 'PUT' : 'POST';
 
