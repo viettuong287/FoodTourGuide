@@ -10,7 +10,8 @@
     var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
     Func<string, string> Nav = c => ctrl == c ? "sidebar-link active" : "sidebar-link";
     var adminOpen = ctrl == "Admin";
-    var businessOpen = new[] { "Business", "Stall", "StallLocation", "StallGeoFence", "Narration" }.Contains(ctrl);
+    var adminActions = new[] { "Dashboard", "UserRoleManagement", "Subscription", "QrCodes", "SubscriptionOrders" };
+    var businessOpen = new[] { "Business", "Stall", "StallLocation", "StallGeoFence", "Narration", "StallMedia" }.Contains(ctrl);
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -111,11 +112,19 @@
                             </a>
                             <a class="@(ctrl == "Admin" && action == "UserRoleManagement" ? "sidebar-link active" : "sidebar-link")"
                                asp-controller="Admin" asp-action="UserRoleManagement">
-                                <i class="bi bi-people"></i> User/Role Mgmt
+                                <i class="bi bi-people"></i> User / Role
                             </a>
-                            <a class="@(ctrl == "Admin" && action == "Statistics" ? "sidebar-link active" : "sidebar-link")"
-                               asp-controller="Admin" asp-action="Statistics">
-                                <i class="bi bi-bar-chart"></i> Statistics
+                            <a class="@(ctrl == "Admin" && action == "Subscription" ? "sidebar-link active" : "sidebar-link")"
+                               asp-controller="Admin" asp-action="Subscription">
+                                <i class="bi bi-credit-card"></i> Subscription
+                            </a>
+                            <a class="@(ctrl == "Admin" && action == "SubscriptionOrders" ? "sidebar-link active" : "sidebar-link")"
+                               asp-controller="Admin" asp-action="SubscriptionOrders">
+                                <i class="bi bi-receipt"></i> Đơn hàng
+                            </a>
+                            <a class="@(ctrl == "Admin" && action == "QrCodes" ? "sidebar-link active" : "sidebar-link")"
+                               asp-controller="Admin" asp-action="QrCodes">
+                                <i class="bi bi-qr-code"></i> Mã QR
                             </a>
                         </div>
                     }
@@ -221,7 +230,7 @@
     <script>
         // Sync JWT token to localStorage
         $(document).ready(function () {
-            var serverToken = '@Html.Raw(Context.Session.GetString("AuthToken") ?? "")';
+            var serverToken = @Json.Serialize(Context.Session.GetString("AuthToken") ?? "");
             if (serverToken && serverToken.trim() !== '') {
                 localStorage.setItem('jwtToken', serverToken);
             } else {
