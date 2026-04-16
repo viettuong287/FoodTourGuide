@@ -7,21 +7,25 @@ namespace Web.Filters
 {
     public class TokenExpirationFilter : IAsyncActionFilter
     {
-        private static readonly string[] _publicPaths =
+        private static readonly (string Controller, string Action)[] _publicActions =
         [
-            "/Auth/Login",
-            "/Auth/Register",
-            "/Auth/Logout",
-            "/Home/Index",
-            "/Home/Privacy",
+            ("Auth",  "Login"),
+            ("Auth",  "Register"),
+            ("Auth",  "Logout"),
+            ("Home",  "Index"),
+            ("Home",  "Privacy"),
+            ("Home",  "Error"),
         ];
 
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
-            var path = context.HttpContext.Request.Path;
+            var routeCtrl   = context.RouteData.Values["controller"]?.ToString() ?? "";
+            var routeAction = context.RouteData.Values["action"]?.ToString()     ?? "";
 
             // Bỏ qua các trang public
-            if (_publicPaths.Any(p => path.StartsWithSegments(p)))
+            if (_publicActions.Any(p =>
+                    string.Equals(p.Controller, routeCtrl,   StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(p.Action,     routeAction, StringComparison.OrdinalIgnoreCase)))
             {
                 await next();
                 return;
