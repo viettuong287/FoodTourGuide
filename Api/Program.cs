@@ -1,7 +1,9 @@
 ﻿using System;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Api.Infrastructure.Persistence;
 using Api.Application.Services;
+using Api.Authorization;
 using Api.Domain.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -28,6 +30,7 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IGeoService, GeoService>();
 builder.Services.AddScoped<INarrationAudioService, NarrationAudioService>();
 builder.Services.AddHttpClient<ITranslationService, AzureTranslationService>();
+builder.Services.AddHostedService<TtsBackgroundService>();
 
 // Cấu hình xác thực JWT cho toàn bộ API
 builder.Services.AddAuthentication(options =>
@@ -52,7 +55,14 @@ builder.Services.AddAuthentication(options =>
 });
 
 // Bật authorization policy
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AppPolicies.AdminOnly, policy =>
+        policy.RequireRole("Admin"));
+
+    options.AddPolicy(AppPolicies.AdminOrBusinessOwner, policy =>
+        policy.RequireRole("Admin", "BusinessOwner"));
+});
 
 // Cấu hình CORS để cho phép Web project gọi API
 builder.Services.AddCors(options =>
@@ -120,12 +130,30 @@ app.Use(async (context, next) =>
     }
 });
 
-// Chạy migration tự động nếu có connection string
+// Chạy migration và seed dữ liệu mặc định nếu có connection string
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     if (!string.IsNullOrEmpty(builder.Configuration.GetConnectionString("default")))
-        db.Database.Migrate();
+    {
+        try
+        {
+            db.Database.Migrate();
+            await DbSeeder.SeedAsync(db);
+        }
+        catch (SqlException ex)
+        {
+            // OLD CODE (kept for reference): db.Database.Migrate(); await DbSeeder.SeedAsync(db);
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(ex, "Không thể kết nối SQL Server khi startup. API vẫn chạy, hãy kiểm tra DB rồi chạy migration lại.");
+        }
+        catch (Exception ex)
+        {
+            // OLD CODE (kept for reference): chỉ bắt SqlException.
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning(ex, "Migration khi startup thất bại (ví dụ PendingModelChanges). API vẫn chạy để phục vụ debug.");
+        }
+    }
 }
 
 // Chuyển HTTP sang HTTPS (tắt ở Development để emulator/mobile dùng HTTP)
