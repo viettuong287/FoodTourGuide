@@ -27,14 +27,40 @@ namespace Web.Services
 
         public async Task<ApiResult<LoginResponseDto>?> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.PostAsJsonAsync("api/auth/login", request, cancellationToken);
-            return await response.Content.ReadFromJsonAsync<ApiResult<LoginResponseDto>>(cancellationToken: cancellationToken);
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/auth/login", request, cancellationToken);
+                return await response.Content.ReadFromJsonAsync<ApiResult<LoginResponseDto>>(cancellationToken: cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                return ApiResult<LoginResponseDto>.FromError(
+                    new ErrorDetail { Code = ErrorCode.Validation, Message = "Không thể kết nối đến máy chủ." });
+            }
+            catch (TaskCanceledException)
+            {
+                return ApiResult<LoginResponseDto>.FromError(
+                    new ErrorDetail { Code = ErrorCode.Validation, Message = "Yêu cầu hết thời gian chờ." });
+            }
         }
 
         public async Task<ApiResult<RegisterResponseDto>?> RegisterBusinessOwnerAsync(RegisterBusinessOwnerDto request, CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.PostAsJsonAsync("api/auth/register/business-owner", request, cancellationToken);
-            return await response.Content.ReadFromJsonAsync<ApiResult<RegisterResponseDto>>(cancellationToken: cancellationToken);
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/auth/register/business-owner", request, cancellationToken);
+                return await response.Content.ReadFromJsonAsync<ApiResult<RegisterResponseDto>>(cancellationToken: cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                return ApiResult<RegisterResponseDto>.FromError(
+                    new ErrorDetail { Code = ErrorCode.Validation, Message = "Không thể kết nối đến máy chủ." });
+            }
+            catch (TaskCanceledException)
+            {
+                return ApiResult<RegisterResponseDto>.FromError(
+                    new ErrorDetail { Code = ErrorCode.Validation, Message = "Yêu cầu hết thời gian chờ." });
+            }
         }
 
         public void StoreToken(LoginResponseDto response)
