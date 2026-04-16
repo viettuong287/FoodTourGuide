@@ -8,7 +8,9 @@
       "Bash(grep -v \"//\")",
       "Bash(ls -la /c/Users/Admin/source/repos/FoodTourGuide/Web/Controllers/*.cs)",
       "Bash(grep -l \"class.*Controller.*:\" /c/Users/Admin/source/repos/FoodTourGuide/Web/Controllers/*.cs)",
-      "Bash(xargs head *)"
+      "Bash(xargs head *)",
+      "Bash(xargs grep *)",
+      "Bash(find /c/Users/Admin/source/repos/FoodTourGuide -type f -name \"*.csproj\" -exec grep -l \"VinhThucAudioGuide\" {} \\\\;)"
     ]
   }
 }
