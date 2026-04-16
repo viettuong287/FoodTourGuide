@@ -1,10 +1,12 @@
 @model Web.Models.AdminQrCodesViewModel
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     ViewData["Title"] = "QR Codes";
     var now        = DateTime.UtcNow;
     var totalUnused = Model.TotalCount - Model.TotalUsed;
     var startIndex  = Model.TotalCount == 0 ? 0 : ((Model.Page - 1) * Model.PageSize) + 1;
     var endIndex    = Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
+    var apiBase    = (Configuration["Api:BaseUrl"] ?? "http://localhost:5299/").TrimEnd('/');
 }
 
 @section Styles {
@@ -122,7 +124,9 @@
 
     /* QR preview modal */
     .qr-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0; }
-    #qrCanvas img, #qrCanvas canvas { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; background: #fff; }
+    .qr-spinner-wrap { width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+    .qr-spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: qr-spin 0.7s linear infinite; }
+    @@keyframes qr-spin { to { transform: rotate(360deg); } }
     .qr-preview-code { font-family: monospace; font-size: 13px; color: var(--navy); font-weight: 600; letter-spacing: 0.08em; text-align: center; background: var(--cream-dark); padding: 6px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
     .qr-preview-note { font-size: 13px; color: var(--text-mid); font-style: italic; text-align: center; }
 
@@ -351,7 +355,10 @@
                                 <button type="button"
                                         class="btn btn-sm btn-outline-secondary btn-action"
                                         title="Xem mã QR"
-                                        onclick="openQrModal(@Json.Serialize(q.Id.ToString()), @Json.Serialize(q.Code), @Json.Serialize(q.Note ?? ""))">
+                                        data-qr-id="@q.Id"
+                                        data-qr-code="@q.Code"
+                                        data-qr-note="@(q.Note ?? string.Empty)"
+                                        onclick="openQrModal(this)">
                                     <i class="bi bi-qr-code-scan"></i>
                                 </button>
                                 <!-- Tải ảnh -->
@@ -509,15 +516,24 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="qrImageModalLabel">
-                    <i class="bi bi-qr-code"></i>Mã QR
+                    <i class="bi bi-qr-code"></i>Mã QR — <span id="qrModalCode"></span>
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="qr-preview-wrap">
-                    <div id="qrCanvas" style="width:220px;height:220px;display:flex;align-items:center;justify-content:center;"></div>
+                    <!-- Spinner hiện lúc đang load -->
+                    <div id="qrSpinner" class="qr-spinner-wrap">
+                        <div class="qr-spinner"></div>
+                    </div>
+                    <!-- Ảnh QR từ server -->
+                    <img id="qrPreviewImg" alt="QR Code" style="display:none;width:220px;height:220px;border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;padding:10px;" />
+                    <!-- Lỗi -->
+                    <div id="qrErrorMsg" style="display:none;color:#a2493a;font-size:13px;text-align:center;">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Không tải được ảnh QR.
+                    </div>
                     <div class="qr-preview-code" id="qrPreviewCode"></div>
-                    <div class="qr-preview-note" id="qrPreviewNote"></div>
+                    <div class="qr-preview-note"  id="qrPreviewNote"></div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -531,41 +547,51 @@
 </div>
 
 @section Scripts {
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-    let _qrInstance = null;
+    function openQrModal(btn) {
+        const id   = btn.dataset.qrId;
+        const code = btn.dataset.qrCode;
+        const note = btn.dataset.qrNote;
+        _openQrModal(id, code, note);
+    }
 
-    function openQrModal(id, code, note) {
-        const canvas   = document.getElementById('qrCanvas');
-        const codeEl   = document.getElementById('qrPreviewCode');
-        const noteEl   = document.getElementById('qrPreviewNote');
-        const dlLink   = document.getElementById('qrDownloadLink');
+    async function _openQrModal(id, code, note) {
+        const img       = document.getElementById('qrPreviewImg');
+        const spinner   = document.getElementById('qrSpinner');
+        const errMsg    = document.getElementById('qrErrorMsg');
+        const codeEl    = document.getElementById('qrPreviewCode');
+        const noteEl    = document.getElementById('qrPreviewNote');
+        const titleCode = document.getElementById('qrModalCode');
+        const dlLink    = document.getElementById('qrDownloadLink');
 
-        // Xoá QR cũ
-        canvas.innerHTML = '';
-        _qrInstance = null;
-
-        codeEl.textContent = code;
-        noteEl.textContent = note || '';
+        // Reset
+        img.style.display    = 'none';
+        errMsg.style.display = 'none';
+        spinner.style.display = 'flex';
+        codeEl.textContent   = code;
+        noteEl.textContent   = note || '';
+        titleCode.textContent = code;
         dlLink.href = `/Admin/DownloadQrImage/${id}`;
 
-        // Render QR code client-side từ code string
-        _qrInstance = new QRCode(canvas, {
-            text: code,
-            width: 200,
-            height: 200,
-            colorDark: '#1e2d40',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.Q
-        });
-
+        // Mở modal ngay — ảnh sẽ load sau
         bootstrap.Modal.getOrCreateInstance(document.getElementById('qrImageModal')).show();
+
+        // Load ảnh QR qua endpoint web (cookie auth, không cần JWT)
+        img.onload = () => {
+            spinner.style.display = 'none';
+            img.style.display     = 'block';
+        };
+        img.onerror = () => {
+            spinner.style.display = 'none';
+            errMsg.style.display  = 'block';
+        };
+        img.src = `/Admin/GetQrImage/${id}`;
     }
 
     // Auto-open create modal on validation fail
     @if (Model.ShowCreateModal)
     {
-        <text>document.addEventListener('DOMContentLoaded', function() {
+        <text>document.addEventListener('DOMContentLoaded', function () {
             bootstrap.Modal.getOrCreateInstance(document.getElementById('createQrModal')).show();
         });</text>
     }
