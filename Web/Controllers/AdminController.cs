@@ -245,6 +245,21 @@ namespace Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkQrUsed(
+            Guid id, string code, int page = 1, int pageSize = 20,
+            CancellationToken cancellationToken = default)
+        {
+            var ok = await _qrCodeApiClient.MarkQrUsedAsync(code, cancellationToken);
+            if (ok)
+                TempData["SuccessMessage"] = "Đã đánh dấu mã QR là đã sử dụng.";
+            else
+                TempData["ErrorMessage"] = "Không thể đánh dấu — mã có thể đã dùng hoặc hết hạn.";
+
+            return RedirectToAction(nameof(QrCodes), new { page, pageSize });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteQrCode(
             Guid id, int page = 1, int pageSize = 20,
             CancellationToken cancellationToken = default)
@@ -263,7 +278,16 @@ namespace Web.Controllers
         {
             var bytes = await _qrCodeApiClient.GetQrCodeImageAsync(id, cancellationToken);
             if (bytes is null) return NotFound();
-            return File(bytes, "image/png", $"qr-{id}.png");
+            // Không đặt filename → Content-Disposition: inline → browser render được trong <img>
+            return File(bytes, "image/png");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadQrImage(Guid id, CancellationToken cancellationToken = default)
+        {
+            var bytes = await _qrCodeApiClient.GetQrCodeImageAsync(id, cancellationToken);
+            if (bytes is null) return NotFound();
+            return File(bytes, "image/png", $"qr-{id.ToString()[..8]}.png");
         }
 
         [HttpGet]
