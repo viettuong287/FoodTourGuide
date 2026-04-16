@@ -354,7 +354,7 @@
                                 <button type="button"
                                         class="btn btn-sm btn-outline-secondary btn-action"
                                         title="Xem ảnh QR"
-                                        onclick="openQrImage('@q.Id', '@q.Code', '@Html.Raw(q.Note ?? "")')">
+                                        onclick="openQrImage('@q.Id', '@q.Code', @Json.Serialize(q.Note ?? ""))">
                                     <i class="bi bi-qr-code-scan"></i>
                                 </button>
                                 <!-- Download -->

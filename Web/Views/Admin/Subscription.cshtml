@@ -503,8 +503,8 @@
             document.addEventListener('DOMContentLoaded', function() {
                 new bootstrap.Modal(document.getElementById('editSubModal')).show();
                 document.getElementById('editBusinessId').value   = '@Model.Edit.BusinessId';
-                document.getElementById('editBusinessName').value = '@Html.Raw(Model.Edit.BusinessName)';
-                document.getElementById('modalBizName').textContent = '@Html.Raw(Model.Edit.BusinessName)';
+                document.getElementById('editBusinessName').value = @Json.Serialize(Model.Edit.BusinessName ?? "");
+                document.getElementById('modalBizName').textContent = @Json.Serialize(Model.Edit.BusinessName ?? "");
 
                 var radio = document.getElementById(
                     '@Model.Edit.Plan' === 'Pro' ? 'planPro' : '@Model.Edit.Plan' === 'Basic' ? 'planBasic' : 'planFree'
