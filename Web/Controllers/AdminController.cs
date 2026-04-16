@@ -289,7 +289,7 @@ namespace Web.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateSubscription(
-            SubscriptionFormViewModel model,
+            [Bind(Prefix = "Edit")] SubscriptionFormViewModel model,
             int page = 1, int pageSize = 10, string? search = null,
             CancellationToken cancellationToken = default)
         {
