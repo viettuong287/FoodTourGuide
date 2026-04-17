@@ -10,6 +10,14 @@ using System.Net.Http;
 using System.Text.Json;
 using Color = Microsoft.Maui.Graphics.Color;
 using Microsoft.Maui.ApplicationModel;
+using System;
+using System.Linq;
+using System.Threading;
+using Microsoft.Maui.Controls;           // Trị lỗi ContentPage, Button, SelectionChangedEventArgs
+using Microsoft.Maui.Graphics;           // Trị lỗi Colors
+using Microsoft.Maui.Devices.Sensors;    // Trị lỗi Location, Geolocation, GeolocationRequest
+using Microsoft.Maui.Storage;            // Dùng để đọc Preferences (Sổ tay cài đặt ngôn ngữ)
+using Microsoft.Maui.Media;
 
 namespace VinhThucAudioGuide
 {
@@ -34,7 +42,7 @@ namespace VinhThucAudioGuide
         private int _speechId = 0;
         private POI _selectedPoiForAudio = null;
 
-        // 👇👇👇 DÁN MÃ API KEY ey... CỦA BRO VÀO ĐÂY 👇👇👇
+        //API key
         private readonly string ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjM4MTUxY2VmYzJmZDQ1ZDdhMGQ1NjYyN2ViMzlhZTNjIiwiaCI6Im11cm11cjY0In0=";
 
         public MainPage()
@@ -66,7 +74,7 @@ namespace VinhThucAudioGuide
                 new POI {
                     Name = "Bánh mì Huỳnh Hoa", Category = "Ẩm thực",
                     Latitude = 10.7716, Longitude = 106.6923,
-                    ImageUrl = "https://images.unsplash.com/photo-1655365225165-8d727fe3a0fc?w=500",
+                    ImageUrl = "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/19/66/94/19/banh-mi-362.jpg?w=900&h=-1&s=1",
                     Rating = 4.8, PinColor = Colors.Orange,
                     AudioScripts = new Dictionary<string, string> {
                         { "vi", "Bánh mì Huỳnh Hoa là tiệm bánh mì nổi tiếng tại Sài Gòn, được yêu thích nhờ ổ bánh to, nhiều nhân và hương vị đậm đà. Với công thức đặc trưng cùng lịch sử lâu năm, nơi đây trở thành điểm đến quen thuộc của cả người dân lẫn du khách." },
@@ -187,7 +195,7 @@ namespace VinhThucAudioGuide
             }
         }
 
-        private async Task DrawRouteAsync(double startLon, double startLat, double endLon, double endLat)
+        private async Task DrawRouteAsync(double startLon, double startLat, double endLon, double endLat) //vẽ đường đi
         {
             try
             {
@@ -221,7 +229,7 @@ namespace VinhThucAudioGuide
             }
         }
 
-        private async void Speak_Clicked(object sender, EventArgs e)
+        private async void Speak_Clicked(object sender, EventArgs e) //thuyết minh
         {
             if (_selectedPoiForAudio == null) { await DisplayAlert("Thông báo", "Chọn quán ăn trong danh sách trước nhé!", "OK"); return; }
 
@@ -241,7 +249,7 @@ namespace VinhThucAudioGuide
             int currentId = _speechId;
             _currentAudioPlayer?.Stop();
 
-            // 👇 THUẬT TOÁN BĂM CHỮ THÔNG MINH TRỊ ĐƯỢC TIẾNG THÁI 👇
+         
             var finalSentences = new List<string>();
             var rawParts = text.Split(new[] { '.', '\n', '?', '!' }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -251,7 +259,7 @@ namespace VinhThucAudioGuide
                 string chunk = "";
                 foreach (var word in words)
                 {
-                    // Nếu gom chữ mà chuẩn bị vượt quá 150 ký tự thì bóp cò cắt luôn
+                    
                     if (chunk.Length + word.Length > 150)
                     {
                         finalSentences.Add(chunk.Trim());

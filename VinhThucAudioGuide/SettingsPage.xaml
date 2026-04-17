@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VinhThucAudioGuide.SettingsPage"
+             BackgroundColor="#F5F7FA">
+
+    <Grid>
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="25">
+                <Label x:Name="LblHeader" FontSize="28" FontAttributes="Bold" TextColor="#0055CC" Margin="0,10,0,0"/>
+
+                <Label x:Name="GroupLang" FontSize="13" FontAttributes="Bold" TextColor="Gray" Margin="5,0,0,-15"/>
+                <Frame CornerRadius="15" Padding="0" HasShadow="False" BorderColor="LightGray" BackgroundColor="White">
+                    <Grid Padding="20,15" ColumnDefinitions="*, Auto">
+                        <Grid.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OpenLangMenu"/>
+                        </Grid.GestureRecognizers>
+                        <Label x:Name="LblLang" FontSize="16" TextColor="Black" VerticalOptions="Center"/>
+                        <HorizontalStackLayout Grid.Column="1" Spacing="10" VerticalOptions="Center">
+                            <Label x:Name="LblCurrentLang" TextColor="#0055CC" FontSize="15" FontAttributes="Bold" VerticalOptions="Center"/>
+                            <Label Text=">" TextColor="LightGray" FontSize="18" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+                    </Grid>
+                </Frame>
+
+                <Label x:Name="GroupAudio" FontSize="13" FontAttributes="Bold" TextColor="Gray" Margin="5,10,0,-15"/>
+                <Frame CornerRadius="15" Padding="0" HasShadow="False" BorderColor="LightGray" BackgroundColor="White">
+                    <VerticalStackLayout>
+                        <Grid Padding="20,15" ColumnDefinitions="*, Auto">
+                            <Label x:Name="LblAuto" FontSize="16" TextColor="Black" VerticalOptions="Center"/>
+                            <Switch x:Name="SwAutoPlay" Grid.Column="1" OnColor="#0055CC" />
+                        </Grid>
+                        <BoxView HeightRequest="1" Color="#F0F0F0" Margin="20,0" />
+                        <VerticalStackLayout Padding="20,15" Spacing="5">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <Label x:Name="LblSpeed" FontSize="16" TextColor="Black" VerticalOptions="Center"/>
+                                <HorizontalStackLayout Grid.Column="1" Spacing="5">
+                                    <Entry x:Name="EntSpeed" WidthRequest="60" Keyboard="Numeric" TextColor="#0055CC" BackgroundColor="Transparent" FontAttributes="Bold" HorizontalTextAlignment="Center" TextChanged="OnEntSpeedChanged"/>
+                                    <Label Text="x" TextColor="#0055CC" VerticalOptions="Center" FontAttributes="Bold"/>
+                                </HorizontalStackLayout>
+                            </Grid>
+                            <Slider x:Name="SldSpeed" Minimum="0.25" Maximum="2.0" ValueChanged="OnSldSpeedChanged" MinimumTrackColor="#0055CC"/>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Button x:Name="BtnSave" Clicked="OnSaveClicked" BackgroundColor="#0055CC" TextColor="White" FontAttributes="Bold" CornerRadius="15" HeightRequest="55" Margin="0,10,0,20"/>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <BoxView x:Name="Overlay" Color="Black" Opacity="0" IsVisible="False">
+            <BoxView.GestureRecognizers>
+                <TapGestureRecognizer Tapped="CloseLangMenu"/>
+            </BoxView.GestureRecognizers>
+        </BoxView>
+        <Frame x:Name="LangModal" VerticalOptions="End" TranslationY="600" Padding="20,20,20,40" CornerRadius="20" BackgroundColor="White">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Chọn ngôn ngữ / Language" FontAttributes="Bold" FontSize="18" HorizontalOptions="Center" Margin="0,0,0,15" TextColor="Black"/>
+                <Button Text="🇻🇳 Tiếng Việt" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <BoxView HeightRequest="1" Color="#F0F0F0" />
+                <Button Text="🇬🇧 English" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <BoxView HeightRequest="1" Color="#F0F0F0" />
+                <Button Text="🇫🇷 Français" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <BoxView HeightRequest="1" Color="#F0F0F0" />
+                <Button Text="🇨🇳 中文" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <BoxView HeightRequest="1" Color="#F0F0F0" />
+                <Button Text="🇯🇵 日本語" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+            </VerticalStackLayout>
+        </Frame>
+    </Grid>
+</ContentPage>
