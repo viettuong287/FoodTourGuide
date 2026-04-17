@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+             x:Class="VinhThucAudioGuide.QRScannerPage"
+             Title="Quét Mã Kích Hoạt">
+
+    <Grid>
+        <zxing:CameraBarcodeReaderView 
+            x:Name="CameraReader"
+            BarcodesDetected="CameraReader_BarcodesDetected"
+            IsDetecting="True" />
+
+        <VerticalStackLayout VerticalOptions="End" BackgroundColor="#AA000000" Padding="20">
+            <Label Text="Vui lòng quét mã QR trên vé để sử dụng ứng dụng" 
+                   TextColor="White" HorizontalOptions="Center" FontAttributes="Bold" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>

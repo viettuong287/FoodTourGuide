@@ -1,19 +1,23 @@
-﻿using Microsoft.Maui;
-using Microsoft.Maui.Controls;
+﻿namespace VinhThucAudioGuide;
 
-namespace VinhThucAudioGuide
+public partial class App : Application
 {
-    public partial class App : Application
+    public App()
     {
-        public App()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
 
-        // Dùng hàm này để khởi động TabBar (AppShell) là chuẩn bài không bao giờ lỗi
-        protected override Window CreateWindow(IActivationState? activationState)
+        // Kiểm tra xem đã được cấp phép chưa
+        bool isUnlocked = Preferences.Default.Get("IsAppUnlocked", false);
+
+        if (isUnlocked)
         {
-            return new Window(new AppShell());
+            // Nếu đã quét QR rồi thì vào thẳng giao diện chính (AppShell hoặc MainPage)
+            MainPage = new AppShell();
+        }
+        else
+        {
+            // Nếu chưa quét thì nhốt ở trang Quét mã QR
+            MainPage = new QRScannerPage();
         }
     }
 }

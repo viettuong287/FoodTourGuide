@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using SkiaSharp.Views.Maui.Controls.Hosting;
+using ZXing.Net.Maui.Controls;
 
 namespace VinhThucAudioGuide
 {
@@ -10,6 +11,7 @@ namespace VinhThucAudioGuide
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseBarcodeReader()
                 .UseSkiaSharp() // Cấu hình lõi vẽ bản đồ
                 .ConfigureFonts(fonts =>
                 {
