@@ -113,9 +113,26 @@ namespace Api.Application.Services
 
                 // Nếu ngôn ngữ đích trùng với ngôn ngữ gốc thì dùng nguyên văn bản.
                 // Nếu khác nhau thì dịch sang ngôn ngữ đích trước khi đọc bằng TTS.
-                var textToSpeak = string.Equals(languageCode, targetLanguageCode, StringComparison.OrdinalIgnoreCase)
-                    ? scriptText
-                    : await _translationService.TranslateAsync(scriptText, languageCode, targetLanguageCode);
+                string textToSpeak;
+                if (string.Equals(languageCode, targetLanguageCode, StringComparison.OrdinalIgnoreCase))
+                {
+                    textToSpeak = scriptText;
+                }
+                else
+                {
+                    try
+                    {
+                        textToSpeak = await _translationService.TranslateAsync(scriptText, languageCode, targetLanguageCode);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "Bỏ qua voice profile {VoiceProfileId} vì dịch từ {FromCode} sang {ToCode} thất bại: {Error}",
+                            profile.Id, languageCode, targetLanguageCode, ex.Message);
+                        continue;
+                    }
+                }
 
                 _logger.LogInformation(
                     "Đang xử lý voice profile {VoiceProfileId} với ngôn ngữ đích {TargetLanguageCode} cho NarrationContentId: {NarrationContentId}",
@@ -129,15 +146,15 @@ namespace Api.Application.Services
 
                 // Tạo hoặc cập nhật một bản ghi audio cho profile hiện tại.
                 // profile.Id và profile.Provider được lưu kèm để truy vết nguồn cấu hình TTS đã dùng.
+                // Lỗi TTS synthesis KHÔNG được bắt ở đây — để propagate lên background service.
                 var audio = await CreateOrUpdateSingleAsync(narrationContentId, textToSpeak, targetLanguageCode, profileVoice, provider, profile.Id, profile.Provider);
+
+                // Lưu ngay sau khi tạo thành công để không mất audio nếu profile tiếp theo lỗi.
+                await _context.SaveChangesAsync();
                 results.Add(audio);
 
                 _logger.LogInformation("Hoàn tất voice profile {VoiceProfileId} cho NarrationContentId: {NarrationContentId}", profile.Id, narrationContentId);
             }
-
-            // Bước 8: Lưu toàn bộ thay đổi vào database sau khi xử lý xong tất cả profile.
-            // Việc SaveChangesAsync chỉ gọi một lần giúp giảm số lần round-trip tới DB.
-            await _context.SaveChangesAsync();
 
             _logger.LogInformation("Đã lưu {Count} audio TTS cho NarrationContentId: {NarrationContentId}", results.Count, narrationContentId);
 
@@ -220,10 +237,13 @@ namespace Api.Application.Services
         private async Task<(string audioUrl, string blobId, int? durationSeconds, string voiceName)> SynthesizeAndUploadAsync(Guid narrationContentId, string scriptText, string languageCode, string? voice)
         {
             // Kiểm tra cấu hình Azure Speech trước khi gọi dịch vụ bên ngoài.
-            // Nếu thiếu endpoint hoặc key, không nên synthesize vì sẽ lỗi ngay từ tầng SDK.
-            if (string.IsNullOrWhiteSpace(_speechSettings.Endpoint) || string.IsNullOrWhiteSpace(_speechSettings.Key))
+            if (string.IsNullOrWhiteSpace(_speechSettings.Key))
             {
-                throw new InvalidOperationException("Thiếu cấu hình Azure Speech (Endpoint/Key).");
+                throw new InvalidOperationException("Thiếu cấu hình Azure Speech Key.");
+            }
+            if (string.IsNullOrWhiteSpace(_speechSettings.Region) && string.IsNullOrWhiteSpace(_speechSettings.Endpoint))
+            {
+                throw new InvalidOperationException("Thiếu cấu hình Azure Speech: cần Region hoặc Endpoint.");
             }
 
             // Kiểm tra cấu hình Blob Storage trước khi upload file audio.
@@ -242,8 +262,19 @@ namespace Api.Application.Services
             }
 
             // Tạo cấu hình cho Azure Speech SDK.
-            // Endpoint + key là credential để gọi dịch vụ TTS của Azure.
-            var speechConfig = SpeechConfig.FromEndpoint(new Uri(_speechSettings.Endpoint), _speechSettings.Key);
+            // Ưu tiên FromSubscription(key, region) vì đây là cách chuẩn của SDK.
+            // Fallback sang FromEndpoint khi chỉ có endpoint (custom deployment).
+            SpeechConfig speechConfig;
+            if (!string.IsNullOrWhiteSpace(_speechSettings.Region))
+            {
+                speechConfig = SpeechConfig.FromSubscription(_speechSettings.Key, _speechSettings.Region);
+            }
+            else
+            {
+                if (!Uri.TryCreate(_speechSettings.Endpoint, UriKind.Absolute, out var endpointUri))
+                    throw new InvalidOperationException($"Azure Speech Endpoint không hợp lệ: '{_speechSettings.Endpoint}'.");
+                speechConfig = SpeechConfig.FromEndpoint(endpointUri, _speechSettings.Key);
+            }
             speechConfig.SpeechSynthesisVoiceName = voiceName;
             speechConfig.SpeechSynthesisLanguage = languageCode;
 
