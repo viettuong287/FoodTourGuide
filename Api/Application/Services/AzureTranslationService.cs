@@ -123,23 +123,27 @@ namespace Api.Application.Services
         /// <returns>Văn bản đã dịch; trả về chuỗi rỗng nếu không đọc được dữ liệu.</returns>
         private static string ExtractTranslatedText(string json)
         {
-            // Phản hồi của Azure Translator là mảng, phần tử đầu tiên chứa danh sách bản dịch tương ứng.
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() == 0)
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() == 0)
+                    return string.Empty;
+
+                if (!root[0].TryGetProperty("translations", out var translations) ||
+                    translations.ValueKind != JsonValueKind.Array ||
+                    translations.GetArrayLength() == 0)
+                    return string.Empty;
+
+                if (!translations[0].TryGetProperty("text", out var textProp))
+                    return string.Empty;
+
+                return textProp.GetString() ?? string.Empty;
+            }
+            catch (JsonException)
             {
                 return string.Empty;
             }
-
-            // Lấy mảng translations để đảm bảo chọn đúng kết quả dịch đầu tiên từ API.
-            var translations = root[0].GetProperty("translations");
-            if (translations.ValueKind != JsonValueKind.Array || translations.GetArrayLength() == 0)
-            {
-                return string.Empty;
-            }
-
-            // Ưu tiên giá trị text trả về; nếu thiếu thì trả rỗng để tầng trên xử lý theo nghiệp vụ.
-            return translations[0].GetProperty("text").GetString() ?? string.Empty;
         }
 
         /// <summary>
