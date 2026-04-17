@@ -133,6 +133,24 @@
 
     .form-check-input:checked { background-color: var(--gold); border-color: var(--gold); }
 
+    /* TTS Status */
+    .tts-status-card { border-radius: var(--radius); margin-bottom: 24px; overflow: hidden; border: 1px solid; }
+    .tts-status-pending { background: rgba(59,130,246,0.07); border-color: rgba(59,130,246,0.25); }
+    .tts-status-processing { background: rgba(184,150,78,0.07); border-color: rgba(184,150,78,0.3); }
+    .tts-status-completed { background: rgba(74,124,89,0.07); border-color: rgba(74,124,89,0.25); }
+    .tts-status-failed { background: rgba(162,73,58,0.07); border-color: rgba(162,73,58,0.3); }
+    .tts-status-none { background: var(--cream); border-color: var(--border); }
+    .tts-status-body { padding: 16px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .tts-status-icon { font-size: 20px; flex-shrink: 0; }
+    .tts-status-text { flex: 1; min-width: 0; }
+    .tts-status-label { font-weight: 600; font-size: 13.5px; margin-bottom: 2px; }
+    .tts-status-sub { font-size: 12.5px; color: var(--text-light); margin: 0; }
+    .tts-error-detail { font-size: 12.5px; color: #a2493a; margin-top: 4px; word-break: break-word; }
+    .btn-retry-tts { background: rgba(162,73,58,0.1); color: #a2493a; border: 1.5px solid rgba(162,73,58,0.3); font-weight: 600; font-size: 13px; padding: 8px 16px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .btn-retry-tts:hover { background: #a2493a; color: #fff; border-color: #a2493a; }
+    @@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin 1s linear infinite; }
+
     @@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
     .anim-1 { animation: fadeUp 0.45s ease 0.08s both; }
     .anim-2 { animation: fadeUp 0.45s ease 0.15s both; }
@@ -226,6 +244,73 @@
     </form>
 </div>
 
+<!-- TTS Status -->
+@{
+    var ttsStatus = content?.TtsStatus ?? "None";
+    var ttsError  = content?.TtsError;
+    var contentId = content?.Id ?? Guid.Empty;
+    string ttsCardClass, ttsIconHtml, ttsLabel, ttsSub;
+    bool isPolling = ttsStatus == "Pending" || ttsStatus == "Processing";
+    switch (ttsStatus)
+    {
+        case "Pending":
+            ttsCardClass = "tts-status-pending";
+            ttsIconHtml  = "<span class=\"spin\" style=\"color:#3b82f6\"><i class=\"bi bi-hourglass-split\"></i></span>";
+            ttsLabel     = "Đang chờ tạo thuyết minh...";
+            ttsSub       = "Hệ thống sẽ tự động tạo audio cho tất cả ngôn ngữ. Trang sẽ tự làm mới khi hoàn thành.";
+            break;
+        case "Processing":
+            ttsCardClass = "tts-status-processing";
+            ttsIconHtml  = "<span class=\"spin\" style=\"color:var(--gold)\"><i class=\"bi bi-gear\"></i></span>";
+            ttsLabel     = "Đang tạo thuyết minh đa ngôn ngữ...";
+            ttsSub       = "Azure TTS đang dịch và tạo audio. Trang sẽ tự làm mới khi hoàn thành.";
+            break;
+        case "Completed":
+            bool completedHasAudio = Model.Audios.Count > 0;
+            ttsCardClass = completedHasAudio ? "tts-status-completed" : "tts-status-failed";
+            ttsIconHtml  = completedHasAudio
+                ? "<i class=\"bi bi-check-circle-fill\" style=\"color:#3a7d4f\"></i>"
+                : "<i class=\"bi bi-exclamation-circle-fill\" style=\"color:#a2493a\"></i>";
+            ttsLabel     = completedHasAudio ? "Thuyết minh đa ngôn ngữ đã sẵn sàng" : "Hoàn thành nhưng không có audio nào được tạo";
+            ttsSub       = completedHasAudio ? "Tất cả audio đã được tạo và lưu ở bên dưới." : "Có thể do lỗi cấu hình Azure. Vui lòng kiểm tra lại và tạo lại.";
+            break;
+        case "Failed":
+            ttsCardClass = "tts-status-failed";
+            ttsIconHtml  = "<i class=\"bi bi-exclamation-circle-fill\" style=\"color:#a2493a\"></i>";
+            ttsLabel     = "Tạo thuyết minh thất bại";
+            ttsSub       = "Vui lòng kiểm tra lỗi và thử lại.";
+            break;
+        default:
+            ttsCardClass = "tts-status-none";
+            ttsIconHtml  = "<i class=\"bi bi-info-circle\" style=\"color:var(--text-light)\"></i>";
+            ttsLabel     = "Chưa có TTS";
+            ttsSub       = "Gói hiện tại không hỗ trợ tự động tạo thuyết minh.";
+            break;
+    }
+}
+<div class="tts-status-card @ttsCardClass" id="ttsStatusCard" data-content-id="@contentId" data-tts-status="@ttsStatus">
+    <div class="tts-status-body">
+        <div class="tts-status-icon">@Html.Raw(ttsIconHtml)</div>
+        <div class="tts-status-text">
+            <div class="tts-status-label" id="ttsStatusLabel">@ttsLabel</div>
+            <p class="tts-status-sub" id="ttsStatusSub">@ttsSub</p>
+            @if (ttsStatus == "Failed" && !string.IsNullOrWhiteSpace(ttsError))
+            {
+                <p class="tts-error-detail" id="ttsErrorDetail"><i class="bi bi-bug"></i> @ttsError</p>
+            }
+        </div>
+        @if (ttsStatus == "Failed" || (ttsStatus == "Completed" && Model.Audios.Count == 0))
+        {
+            <form asp-action="RetryTts" asp-route-id="@contentId" method="post" style="flex-shrink:0">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn-retry-tts">
+                    <i class="bi bi-arrow-repeat"></i>@(ttsStatus == "Failed" ? "Thử lại TTS" : "Tạo lại thuyết minh")
+                </button>
+            </form>
+        }
+    </div>
+</div>
+
 <!-- Narration Audio Table -->
 <div class="card anim-2">
     <div class="audio-section-header">
@@ -315,6 +400,40 @@
 </div>
 
 @section Scripts {
+<script>
+    // ── TTS status polling ────────────────────────────────────────────────────
+    (function () {
+        var card = document.getElementById('ttsStatusCard');
+        if (!card) return;
+
+        var status = card.getAttribute('data-tts-status');
+        if (status !== 'Pending' && status !== 'Processing') return;
+
+        var contentId = card.getAttribute('data-content-id');
+        var pollInterval = 5000; // 5 seconds
+
+        function pollTtsStatus() {
+            fetch('/Narration/TtsStatus/' + contentId, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    var result = data && data.data ? data.data : null;
+                    if (!result) return;
+
+                    var newStatus = result.ttsStatus || 'None';
+                    card.setAttribute('data-tts-status', newStatus);
+
+                    if (newStatus === 'Completed' || newStatus === 'Failed') {
+                        // Reload the page to show updated audio list and status
+                        window.location.reload();
+                    }
+                    // Still pending/processing → continue polling
+                })
+                .catch(function () { /* swallow polling errors silently */ });
+        }
+
+        setInterval(pollTtsStatus, pollInterval);
+    })();
+</script>
 <script>
     (function () {
         function toggleGroup(groupId, expand) {
