@@ -3,17 +3,41 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
              x:Class="VinhThucAudioGuide.QRScannerPage"
-             Title="Quét Mã Kích Hoạt">
+             Title="Quét Vé"
+             NavigationPage.HasNavigationBar="False">
 
     <Grid>
         <zxing:CameraBarcodeReaderView 
             x:Name="CameraReader"
-            BarcodesDetected="CameraReader_BarcodesDetected"
+            BarcodesDetected="OnBarcodesDetected"
             IsDetecting="True" />
 
-        <VerticalStackLayout VerticalOptions="End" BackgroundColor="#AA000000" Padding="20">
-            <Label Text="Vui lòng quét mã QR trên vé để sử dụng ứng dụng" 
-                   TextColor="White" HorizontalOptions="Center" FontAttributes="Bold" />
+        <Grid RowDefinitions="*, 250, *" ColumnDefinitions="*, 250, *">
+            <BoxView Grid.Row="0" Grid.ColumnSpan="3" BackgroundColor="#99000000" />
+            <BoxView Grid.Row="2" Grid.ColumnSpan="3" BackgroundColor="#99000000" />
+            <BoxView Grid.Row="1" Grid.Column="0" BackgroundColor="#99000000" />
+            <BoxView Grid.Row="1" Grid.Column="2" BackgroundColor="#99000000" />
+
+            <Border Grid.Row="1" Grid.Column="1" 
+                    Stroke="#00C853" StrokeThickness="3" 
+                    BackgroundColor="Transparent" 
+                    StrokeShape="RoundRectangle 15" />
+
+            <BoxView Grid.Row="1" Grid.Column="1" 
+                     HeightRequest="2" BackgroundColor="#00C853" 
+                     VerticalOptions="Center" Opacity="0.8"/>
+        </Grid>
+
+        <VerticalStackLayout Margin="0,60,0,0" HorizontalOptions="Center">
+            <Label Text="Đưa mã QR vào trung tâm hộp" 
+                   TextColor="White" 
+                   FontSize="18" 
+                   FontAttributes="Bold" />
         </VerticalStackLayout>
+
+        <Button Text="✕" TextColor="White" BackgroundColor="Transparent" 
+                FontSize="24" FontAttributes="Bold"
+                HorizontalOptions="Start" VerticalOptions="Start" 
+                Margin="10,20,0,0" Clicked="BtnClose_Clicked"/>
     </Grid>
 </ContentPage>

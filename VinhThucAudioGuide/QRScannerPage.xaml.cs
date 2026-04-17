@@ -1,7 +1,8 @@
-using Microsoft.Maui.Controls;
 using ZXing.Net.Maui;
 using Microsoft.Maui.Storage;
 using System.Linq;
+using System;
+using Microsoft.Maui.Controls;
 
 namespace VinhThucAudioGuide;
 
@@ -11,49 +12,44 @@ public partial class QRScannerPage : ContentPage
     {
         InitializeComponent();
 
-        // Cấu hình Camera đơn giản, an toàn không báo lỗi
+        // CHỖ NÀY ĐÃ ĐƯỢC SỬA CHUẨN: Truyền thẳng tên mã vạch, bỏ cái ngoặc vuông mảng đi!
         CameraReader.Options = new BarcodeReaderOptions
         {
+            Formats = BarcodeFormat.QrCode,
             AutoRotate = true,
-            Multiple = false
-        }; 
+            Multiple = false // Quét dính 1 cái là dừng
+        };
+    }
 
-    private void CameraReader_BarcodesDetected(object sender, BarcodeDetectionEventArgs e)
+    private void OnBarcodesDetected(object sender, BarcodeDetectionEventArgs e)
     {
         var result = e.Results.FirstOrDefault();
-        if (result != null)
+        if (result == null) return;
+
+        Dispatcher.DispatchAsync(async () =>
         {
-            // Bắt buộc chạy trên luồng giao diện (UI Thread)
-            Dispatcher.DispatchAsync(async () =>
+            // Tắt camera ngay lập tức khi bắt được mã
+            CameraReader.IsDetecting = false;
+
+            // KIỂM TRA MÃ VIP
+            if (result.Value == "FOODTOUR_VIP_2026")
             {
-                // 1. Tạm dừng camera ngay lập tức để không quét bồi thêm
-                CameraReader.IsDetecting = false;
+                Preferences.Default.Set("IsAppUnlocked", true);
 
-                // ==========================================
-                // 2. KHAI BÁO MÃ QR CỨNG (HARDCODED)
-                // ==========================================
-                string maBiMatCuaSep = "8E8F1796A99745F4";
+                await DisplayAlert("Thành công", "Đã xác nhận vé hợp lệ!", "Vào App");
 
-                // 3. Kiểm tra xem mã khách quét có đúng mã VIP không
-                if (result.Value == maBiMatCuaSep)
-                {
-                    // Đánh dấu vào sổ tay là vé xịn, đã qua cửa
-                    Preferences.Default.Set("IsAppUnlocked", true);
+                Application.Current.MainPage = new AppShell();
+            }
+            else
+            {
+                await DisplayAlert("Lỗi", "Mã vé không hợp lệ!", "Quét lại");
+                CameraReader.IsDetecting = true;
+            }
+        });
+    }
 
-                    await DisplayAlert("Kích hoạt thành công", "Chào mừng bạn đến với Tour Vĩnh Thực!", "Bắt đầu");
-
-                    // Chuyển thẳng vào giao diện chính của app (AppShell)
-                    Application.Current.MainPage = new AppShell();
-                }
-                else
-                {
-                    // Nếu quét mã tào lao (ví dụ mã lon bò húc, mã momo người khác...)
-                    await DisplayAlert("Vé không hợp lệ", "Mã QR này không đúng. Vui lòng quét mã trên vé của bạn!", "Quét lại");
-
-                    // Bật camera lên cho quét lại
-                    CameraReader.IsDetecting = true;
-                }
-            });
-        }
+    private void BtnClose_Clicked(object sender, EventArgs e)
+    {
+        Application.Current.Quit();
     }
 }
