@@ -1,23 +1,24 @@
 ﻿using Mapsui;
+using Mapsui.Layers;
+using Mapsui.Projections;
+using Mapsui.Providers;
+using Mapsui.Styles;
 using Mapsui.Tiling;
 using Mapsui.UI.Maui;
-using Mapsui.Projections;
-using Mapsui.Layers;
-using Mapsui.Styles;
-using Mapsui.Providers;
-using Plugin.Maui.Audio;
-using System.Net.Http;
-using System.Text.Json;
-using Color = Microsoft.Maui.Graphics.Color;
 using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Controls;           // Trị lỗi ContentPage, Button, SelectionChangedEventArgs
+using Microsoft.Maui.Devices.Sensors;    // Trị lỗi Location, Geolocation, GeolocationRequest
+using Microsoft.Maui.Graphics;           // Trị lỗi Colors
+using Microsoft.Maui.Media;
+using Microsoft.Maui.Storage;            // Dùng để đọc Preferences (Sổ tay cài đặt ngôn ngữ)
+using Plugin.Maui.Audio;
 using System;
 using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
-using Microsoft.Maui.Controls;           // Trị lỗi ContentPage, Button, SelectionChangedEventArgs
-using Microsoft.Maui.Graphics;           // Trị lỗi Colors
-using Microsoft.Maui.Devices.Sensors;    // Trị lỗi Location, Geolocation, GeolocationRequest
-using Microsoft.Maui.Storage;            // Dùng để đọc Preferences (Sổ tay cài đặt ngôn ngữ)
-using Microsoft.Maui.Media;
+using VinhThucAudioGuide.Services;
+using Color = Microsoft.Maui.Graphics.Color;
 
 namespace VinhThucAudioGuide
 {
@@ -49,8 +50,12 @@ namespace VinhThucAudioGuide
         {
             InitializeComponent();
             InitMap();
-            LoadData();
             GetLocationAndCenter();
+        }
+        protected override async void OnAppearing()
+        {
+            base.OnAppearing();
+            await LoadDataAsync(); // Nạp dữ liệu từ DB (Có await đàng hoàng)
         }
 
         private void InitMap()
@@ -67,52 +72,42 @@ namespace VinhThucAudioGuide
             mapView.Map.Navigator.CenterOnAndZoomTo(new MPoint(x, y), 2.0);
         }
 
-        private void LoadData()
+        private async Task LoadDataAsync()
         {
-            _allPois = new List<POI>
+            // 1. Khởi tạo danh sách trống
+            _allPois = new List<POI>();
+
+            // 2. Gọi bộ não Database lên
+            var dbService = new VinhThucAudioGuide.Services.LocalDbService();
+            var danhSachTuDB = await dbService.GetAllTourLocations();
+
+            // 3. Quét qua DB và nặn ra các điểm POI
+            foreach (var loc in danhSachTuDB)
             {
-                new POI {
-                    Name = "Bánh mì Huỳnh Hoa", Category = "Ẩm thực",
-                    Latitude = 10.7716, Longitude = 106.6923,
-                    ImageUrl = "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/19/66/94/19/banh-mi-362.jpg?w=900&h=-1&s=1",
-                    Rating = 4.8, PinColor = Colors.Orange,
-                    AudioScripts = new Dictionary<string, string> {
-                        { "vi", "Bánh mì Huỳnh Hoa là tiệm bánh mì nổi tiếng tại Sài Gòn, được yêu thích nhờ ổ bánh to, nhiều nhân và hương vị đậm đà. Với công thức đặc trưng cùng lịch sử lâu năm, nơi đây trở thành điểm đến quen thuộc của cả người dân lẫn du khách." },
-                        { "th", "บั๋นหมี่ ฮวี่นฮวา เป็นร้านแซนด์วิชที่มีชื่อเสียงในไซง่อน เป็นที่ชื่นชอบเพราะขนมปังก้อนใหญ่ ไส้เยอะ และรสชาติเข้มข้น ด้วยสูตรเฉพาะและประวัติศาสตร์อันยาวนาน ที่นี่จึงกลายเป็นจุดหมายปลายทางยอดนิยมสำหรับทั้งคนในพื้นที่และนักท่องเที่ยว" },
-                        { "en-US", "Huynh Hoa Banh Mi is a famous sandwich shop in Saigon, loved for its large size, generous fillings, and rich flavor. With its signature recipe and long history, it has become a familiar destination for both locals and tourists." },
-                        { "en-AU", "Huynh Hoa Banh Mi is a famous sandwich shop in Saigon, loved for its large size, generous fillings, and rich flavor. With its signature recipe and long history, it has become a familiar destination for both locals and tourists, mate." },
-                        { "en-CA", "Huynh Hoa Banh Mi is a famous sandwich shop in Saigon, loved for its large size, generous fillings, and rich flavor. With its signature recipe and long history, it has become a familiar destination for both locals and tourists, eh." }
-                    }
-                },
-                new POI {
-                    Name = "Bảo tàng Lịch sử TP.HCM", Category = "Du lịch",
-                    Latitude = 10.7882, Longitude = 106.7049,
-                    ImageUrl = "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=500",
-                    Rating = 4.5, PinColor = Colors.Blue,
-                    AudioScripts = new Dictionary<string, string> {
-                        { "vi", "Bảo tàng Lịch sử Việt Nam là nơi lưu giữ nhiều hiện vật quý giá, tái hiện quá trình hình thành và phát triển của dân tộc. Với không gian trưng bày phong phú, đây là điểm tham quan hấp dẫn cho những ai yêu thích lịch sử và văn hóa." },
-                        { "th", "พิพิธภัณฑ์ประวัติศาสตร์เวียดนามเป็นสถานที่เก็บรวบรวมโบราณวัตถุอันล้ำค่ามากมาย ซึ่งจำลองกระบวนการก่อตั้งและพัฒนาของชาติ ด้วยพื้นที่จัดแสดงที่หลากหลาย ที่นี่จึงเป็นจุดหมายปลายทางที่น่าสนใจสำหรับผู้ที่รักประวัติศาสตร์และวัฒนธรรม" },
-                        { "en-US", "The Vietnam History Museum houses many precious artifacts, recreating the nation's formation and development process. With its diverse exhibition spaces, it is an attractive destination for those who love history and culture." },
-                        { "en-AU", "The Vietnam History Museum houses many precious artifacts, recreating the nation's formation and development process. It is an attractive destination for those who love history and culture." },
-                        { "en-CA", "The Vietnam History Museum houses many precious artifacts, recreating the nation's formation and development process. It is an attractive destination for those who love history and culture." }
-                    }
-                },
-                new POI {
-                    Name = "Lễ hội Ẩm thực Đêm", Category = "Sự kiện",
-                    Latitude = 10.7745, Longitude = 106.7001,
-                    ImageUrl = "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=500",
-                    Rating = 5.0, PinColor = Colors.Purple,
-                    AudioScripts = new Dictionary<string, string> {
-                        { "vi", "Lễ hội Ẩm thực Đêm Vũng Tàu là sự kiện thu hút đông đảo du khách với nhiều gian hàng ăn uống phong phú. Tại đây, du khách có thể thưởng thức các món hải sản tươi ngon và đặc sản địa phương trong không khí sôi động về đêm." },
-                        { "th", "เทศกาลอาหารกลางคืนวุงเตาเป็นเหตุการณ์ที่ดึงดูดนักท่องเที่ยวจำนวนมากด้วยแผงขายอาหารที่หลากหลาย ที่นี่นักท่องเที่ยวสามารถเพลิดเพลินกับอาหารทะเลสดใหม่และอาหารพื้นเมืองในบรรยากาศยามค่ำคืนที่คึกคัก" },
-                        { "en-US", "The Vung Tau Night Food Festival is an event that attracts a large number of tourists with many diverse food stalls. Here, visitors can enjoy fresh seafood and local specialties in a vibrant nighttime atmosphere." },
-                        { "en-AU", "The Vung Tau Night Food Festival is an event that attracts a large number of tourists with many diverse food stalls. You can enjoy fresh seafood and local specialties in a vibrant nighttime atmosphere, mate." },
-                        { "en-CA", "The Vung Tau Night Food Festival is an event that attracts a large number of tourists with many diverse food stalls. You can enjoy fresh seafood and local specialties in a vibrant nighttime atmosphere, eh." }
-                    }
-                }
-            };
-            cvPoiList.ItemsSource = _allPois;
+                var poiMoi = new POI
+                {
+                    Name = loc.LocationName,
+                    Category = loc.Category,
+                    ImageUrl = loc.ImageUrl,
+                    Latitude = loc.Latitude,
+                    Longitude = loc.Longitude
+                };
+                _allPois.Add(poiMoi);
+            }
+
+            // 4. Bơm dữ liệu ra UI (Bắt buộc phải nằm trong MainThread)
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                // Dọn sạch ghim trên bản đồ (để trống trơn chờ khách bấm list)
+                mapView.Pins.Clear();
+                mapView.Refresh();
+
+                // Bơm 5 địa điểm ra cái danh sách cvPoiList có sẵn của sếp!
+                cvPoiList.ItemsSource = _allPois;
+            });
         }
+
+
 
         private async void GetLocationAndCenter()
         {
@@ -311,5 +306,33 @@ namespace VinhThucAudioGuide
             _speechId++;
             if (_currentAudioPlayer != null && _currentAudioPlayer.IsPlaying) _currentAudioPlayer.Stop();
         }
+        // ==========================================
+        // CÁC HÀM LỌC DANH MỤC
+        // ==========================================
+
+        private void Filter_All_Clicked(object sender, EventArgs e)
+        {
+            // Hiện tất cả
+            cvPoiList.ItemsSource = _allPois;
+        }
+
+        private void Filter_Food_Clicked(object sender, EventArgs e)
+        {
+            // Lọc Thức ăn (Sườn bì chưởng, Bánh mì Huỳnh Hoa)
+            cvPoiList.ItemsSource = _allPois.Where(x => x.Category == "Thức ăn").ToList();
+        }
+
+        private void Filter_Travel_Clicked(object sender, EventArgs e)
+        {
+            // Lọc Vui chơi (Công viên Sáng Tạo, Tao Đàn)
+            cvPoiList.ItemsSource = _allPois.Where(x => x.Category == "Vui chơi").ToList();
+        }
+
+        private void Filter_Event_Clicked(object sender, EventArgs e)
+        {
+            // Lọc Lễ hội (Phố Lồng Đèn)
+            cvPoiList.ItemsSource = _allPois.Where(x => x.Category == "Lễ hội").ToList();
+        }
     }
+
 }

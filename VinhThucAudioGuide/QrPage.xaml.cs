@@ -1,16 +1,22 @@
 using ZXing.Net.Maui;
 using Microsoft.Maui.Controls;
 using System.Linq;
+using VinhThucAudioGuide.Services; // Gọi cái bộ não vào đây
 
 namespace VinhThucAudioGuide;
 
 public partial class QrPage : ContentPage
 {
+    // Khai báo kết nối Database
+    private readonly LocalDbService _dbService;
+
     public QrPage()
     {
         InitializeComponent();
 
-        // Cấu hình bộ quét siêu tốc (Chỉ đọc QR Code)
+        // Khởi tạo Database ngay khi mở trang
+        _dbService = new LocalDbService();
+
         CameraReader.Options = new BarcodeReaderOptions
         {
             Formats = BarcodeFormat.QrCode,
@@ -19,9 +25,6 @@ public partial class QrPage : ContentPage
         };
     }
 
-    // ==========================================
-    // TỐI ƯU PIN: Chỉ bật camera khi người dùng mở Tab này
-    // ==========================================
     protected override void OnAppearing()
     {
         base.OnAppearing();
@@ -31,12 +34,9 @@ public partial class QrPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
-        CameraReader.IsDetecting = false; // Chuyển tab khác là tắt camera cho mát máy
+        CameraReader.IsDetecting = false;
     }
 
-    // ==========================================
-    // XỬ LÝ KHI QUÉT TRÚNG MÃ QR
-    // ==========================================
     private void CameraReader_BarcodesDetected(object sender, BarcodeDetectionEventArgs e)
     {
         var result = e.Results.FirstOrDefault();
@@ -44,16 +44,26 @@ public partial class QrPage : ContentPage
 
         Dispatcher.DispatchAsync(async () =>
         {
-            // Tạm dừng camera ngay lập tức
+            // Tắt camera ngay để tránh quét đúp
             CameraReader.IsDetecting = false;
 
-            // Lấy nội dung của mã QR
-            string noiDungMaQR = result.Value;
+            string maQRKhachQuet = result.Value;
 
-            // Hiện thông báo (Sau này sếp có thể thay chỗ này bằng code gọi hàm đọc âm thanh)
-            await DisplayAlert("Đã nhận diện", $"Nội dung mã: {noiDungMaQR}\n\nĐang tải thuyết minh...", "Nghe");
+            // Đem cái mã vừa quét đi hỏi Database (Tạm thời tìm bản Tiếng Việt - "vi")
+            var kichBan = await _dbService.GetScriptByQRAndLanguage(maQRKhachQuet, "vi");
 
-            // Xử lý xong thì bật camera lại để khách quét điểm tiếp theo
+            if (kichBan != null)
+            {
+                // NẾU TÌM THẤY TRONG DB: Đẩy tiêu đề và nội dung lên màn hình!
+                await DisplayAlert(kichBan.Title, kichBan.Content, "Tuyệt vời");
+            }
+            else
+            {
+                // NẾU MÃ BẬY BẠ HOẶC CHƯA CÓ TRONG DB
+                await DisplayAlert("Thông báo", "Địa điểm này chưa có thông tin thuyết minh!", "Quét lại");
+            }
+
+            // Xử lý xong thì bật lại camera
             CameraReader.IsDetecting = true;
         });
     }
