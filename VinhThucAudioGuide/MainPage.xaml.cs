@@ -150,8 +150,23 @@ namespace VinhThucAudioGuide
         private void Category_Clicked(object sender, EventArgs e)
         {
             var btn = sender as Button;
-            string category = btn.Text.Contains("Ẩm thực") ? "Ẩm thực" : btn.Text.Contains("Du lịch") ? "Du lịch" : "Sự kiện";
-            cvPoiList.ItemsSource = _allPois.Where(p => p.Category == category).ToList();
+            // Chuẩn hoá nhãn nút thành 3 category chuẩn của app
+            var text = (btn?.Text ?? string.Empty).ToLowerInvariant();
+            string category;
+            if (text.Contains("thức") || text.Contains("ẩm") || text.Contains("🍴")) category = "Thức ăn";
+            else if (text.Contains("vui") || text.Contains("du lịch") || text.Contains("🏛")) category = "Vui chơi";
+            else if (text.Contains("lễ") || text.Contains("sự kiện") || text.Contains("🎉")) category = "Lễ hội";
+            else category = string.Empty;
+
+            if (string.IsNullOrEmpty(category))
+            {
+                // nếu không nhận diện được, hiện tất cả
+                cvPoiList.ItemsSource = _allPois;
+            }
+            else
+            {
+                cvPoiList.ItemsSource = _allPois.Where(p => (p.Category ?? string.Empty) == category).ToList();
+            }
         }
 
         private async void Poi_Selected(object sender, SelectionChangedEventArgs e)
@@ -332,7 +347,7 @@ namespace VinhThucAudioGuide
         {
             // Lọc Lễ hội (Phố Lồng Đèn)
             cvPoiList.ItemsSource = _allPois.Where(x => x.Category == "Lễ hội").ToList();
-        }
+        }   
     }
 
 }

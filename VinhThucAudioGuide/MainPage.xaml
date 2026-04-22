@@ -58,11 +58,17 @@
                         <Border.StrokeShape>
                             <RoundRectangle CornerRadius="12" />
                         </Border.StrokeShape>
+                        
 
-                        <!-- Lệnh InputTransparent="True" để tránh Android nuốt cái click chuột của bro -->
-                        <Grid ColumnDefinitions="90, *" InputTransparent="True">
+                        <!-- Ảnh thu gọn thành ô vuông, cố định kích thước để không bị kéo giãn -->
+                        <Grid ColumnDefinitions="90, *">
 
-                            <Image Grid.RowSpan="2" Grid.Column="0" Source="{Binding ImageUrl}" Aspect="AspectFill" />
+                            <Border Grid.RowSpan="2" Grid.Column="0" WidthRequest="72" HeightRequest="72" BackgroundColor="#CCCCCC" Padding="0">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8" />
+                                </Border.StrokeShape>
+                                <Image Source="{Binding ImageUrl}" Aspect="AspectFill" VerticalOptions="Center" HorizontalOptions="Center"/>
+                            </Border>
 
                             <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4" Margin="15,0,0,0">
                                 <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="16" TextColor="#333333"/>
