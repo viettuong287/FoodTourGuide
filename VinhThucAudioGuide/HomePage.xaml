@@ -6,12 +6,16 @@
              BackgroundColor="#F5F7FA">
 
     <Grid RowDefinitions="3*, Auto, Auto, Auto, 2*, Auto" Padding="25">
-        <Image Grid.Row="0" Source="travel_header.jpg" HeightRequest="200" VerticalOptions="Center" HorizontalOptions="Center" Aspect="AspectFill" />
+        <Grid Grid.Row="0">
+            <Image Source="travel_header.jpg" HeightRequest="220" VerticalOptions="Fill" HorizontalOptions="Fill" Aspect="AspectFill" />
+            <Image Source="logoapp.jpg" HeightRequest="100" WidthRequest="100" HorizontalOptions="Center" VerticalOptions="Center" />
+        </Grid>
 
         <Label x:Name="LblTitle" Grid.Row="1" Text="Vĩnh Thực Audio Guide" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#0055CC"/>
         <Label x:Name="LblDesc" Grid.Row="2" Text="Khám phá vẻ đẹp biển đảo qua từng câu chuyện kể tự động." 
                HorizontalTextAlignment="Center" FontSize="16" TextColor="#4A4A4A" Margin="0,15,0,0" LineHeight="1.3"/>
-        <Label Grid.Row="3" Text="v1.0.0" FontSize="13" HorizontalOptions="Center" TextColor="Gray" Margin="0,10,0,0"/>
+        <Image Grid.Row="3" Source="trangchu.jpg" HeightRequest="120" Aspect="AspectFill" HorizontalOptions="Center" Margin="0,10" />
+        <Label Grid.Row="4" Text="v1.0.0" FontSize="13" HorizontalOptions="Center" TextColor="Gray" Margin="0,10,0,0"/>
 
         <Button Grid.Row="5" x:Name="BtnStart" Text="BẮT ĐẦU HÀNH TRÌNH" BackgroundColor="#0055CC" TextColor="White" 
                 FontAttributes="Bold" CornerRadius="15" HeightRequest="55" Margin="0,0,0,20"
