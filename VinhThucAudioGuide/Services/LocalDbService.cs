@@ -26,6 +26,26 @@ public class LocalDbService
         await SeedData();
     }
 
+    // Lấy tất cả kịch bản (content) theo LocationId, trả về map langCode -> content
+    public async Task<Dictionary<string, string>> GetScriptsForLocation(int locationId)
+    {
+        await Init();
+        var result = new Dictionary<string, string>();
+
+        var scripts = await _db.Table<Script>().Where(s => s.LocationId == locationId).ToListAsync();
+        foreach (var s in scripts)
+        {
+            var lang = await _db.Table<Language>().Where(l => l.Id == s.LanguageId).FirstOrDefaultAsync();
+            if (lang != null && !string.IsNullOrEmpty(lang.LangCode))
+            {
+                // store content (prefer Content, fallback Title)
+                result[lang.LangCode] = string.IsNullOrWhiteSpace(s.Content) ? s.Title ?? string.Empty : s.Content;
+            }
+        }
+
+        return result;
+    }
+
     private async Task SeedData()
     {
         // Nếu DB đã có dữ liệu rồi thì bỏ qua không nạp trùng
@@ -167,5 +187,38 @@ public class LocalDbService
         await Init();
         // Lấy tất cả các dòng trong bảng TourLocation
         return await _db.Table<TourLocation>().ToListAsync();
+    }
+
+    // Upsert a list of TourLocation from remote source. Returns number of newly added items.
+    public async Task<int> UpsertTourLocations(List<TourLocation> remoteList)
+    {
+        await Init();
+        int added = 0;
+
+        foreach (var r in remoteList)
+        {
+            // Try to find existing by Name (or very close lat/lon)
+            var existing = await _db.Table<TourLocation>()
+                .Where(t => t.LocationName == r.LocationName)
+                .FirstOrDefaultAsync();
+
+            if (existing == null)
+            {
+                await _db.InsertAsync(r);
+                added++;
+            }
+            else
+            {
+                // Update mutable fields if changed
+                bool dirty = false;
+                if (existing.ImageUrl != r.ImageUrl) { existing.ImageUrl = r.ImageUrl; dirty = true; }
+                if (existing.Latitude != r.Latitude) { existing.Latitude = r.Latitude; dirty = true; }
+                if (existing.Longitude != r.Longitude) { existing.Longitude = r.Longitude; dirty = true; }
+                if (existing.Category != r.Category) { existing.Category = r.Category; dirty = true; }
+                if (dirty) await _db.UpdateAsync(existing);
+            }
+        }
+
+        return added;
     }
 }

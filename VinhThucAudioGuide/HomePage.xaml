@@ -6,7 +6,7 @@
              BackgroundColor="#F5F7FA">
 
     <Grid RowDefinitions="3*, Auto, Auto, Auto, 2*, Auto" Padding="25">
-        <Image Grid.Row="0" Source="logo_app.svg" HeightRequest="200" VerticalOptions="Center" HorizontalOptions="Center" />
+        <Image Grid.Row="0" Source="travel_header.jpg" HeightRequest="200" VerticalOptions="Center" HorizontalOptions="Center" Aspect="AspectFill" />
 
         <Label x:Name="LblTitle" Grid.Row="1" Text="Vĩnh Thực Audio Guide" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#0055CC"/>
         <Label x:Name="LblDesc" Grid.Row="2" Text="Khám phá vẻ đẹp biển đảo qua từng câu chuyện kể tự động." 

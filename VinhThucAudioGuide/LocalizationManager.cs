@@ -17,29 +17,29 @@ public class LocalizationManager : INotifyPropertyChanged
     // --- KỊCH BẢN THUYẾT MINH 5 THỨ TIẾNG ---
     public string AudioScript => CurrentLanguage switch
     {
-        "English" => "Welcome to Vinh Thuc Island. Experience the pristine beauty and the ancient lighthouse.",
-        "Français" => "Bienvenue sur l'île de Vinh Thuc. Découvrez la beauté sauvage et le phare historique.",
-        "中文" => "欢迎来到永实岛。在这里，您可以体验原始的美景和古老的灯塔。",
-        "日本語" => "ヴィントゥック島へようこそ。手つかずの自然と歴史的な灯台をお楽しみください。",
+        "English" => "Welcome to Vinh Thuc. Experience the island's beauty and local stories.",
+        "Français" => "Bienvenue à Vinh Thuc. Découvrez la beauté de l'île et ses récits locaux.",
+        "中文" => "欢迎来到永实。体验岛屿的美丽和本地故事。",
+        "한국어" => "Vinh Thuc에 오신 것을 환영합니다. 섬의 아름다움과 지역 이야기를 체험하세요.",
         _ => "Chào mừng bạn đến với đảo Vĩnh Thực. Hãy trải nghiệm vẻ đẹp hoang sơ và ngọn hải đăng cổ kính."
     };
 
     // --- TỪ ĐIỂN TRANG CHỦ ---
-    public string AppTitle => CurrentLanguage switch { "English" => "Vinh Thuc Guide", "Français" => "Guide Vinh Thuc", "中文" => "永实岛导览", "日本語" => "島ガイド", _ => "Vĩnh Thực Audio Guide" };
-    public string WelcomeText => CurrentLanguage switch { "English" => "Discover island beauty through automated stories.", "Français" => "Découvrez l'île à travers des récits.", "中文" => "通过故事探索岛屿。", "日本語" => "物語で島を探索する。", _ => "Khám phá vẻ đẹp biển đảo qua từng câu chuyện kể." };
-    public string StartButton => CurrentLanguage switch { "English" => "START", "Français" => "DÉMARRER", "中文" => "开始", "日本語" => "スタート", _ => "BẮT ĐẦU" };
+    public string AppTitle => CurrentLanguage switch { "English" => "Vinh Thuc Guide", "Français" => "Guide Vinh Thuc", "中文" => "永实岛导览", "한국어" => "빈득 안내", _ => "Vĩnh Thực Audio Guide" };
+    public string WelcomeText => CurrentLanguage switch { "English" => "Discover island beauty through automated stories.", "Français" => "Découvrez l'île à travers des récits.", "中文" => "通过故事探索岛屿。", "한국어" => "자동 내레이션으로 섬의 아름다움을 발견하세요.", _ => "Khám phá vẻ đẹp biển đảo qua từng câu chuyện kể." };
+    public string StartButton => CurrentLanguage switch { "English" => "START", "Français" => "DÉMARRER", "中文" => "开始", "한국어" => "시작", _ => "BẮT ĐẦU" };
 
     // --- TỪ ĐIỂN TRANG CÀI ĐẶT ---
-    public string SettingsTitle => CurrentLanguage switch { "English" => "SETTINGS", "Français" => "PARAMÈTRES", "中文" => "设置", "日本語" => "設定", _ => "CÀI ĐẶT" };
-    public string LanguageLabel => CurrentLanguage switch { "English" => "App Language", "Français" => "Langue de l'application", "中文" => "应用语言", "日本語" => "アプリの言語", _ => "Ngôn ngữ ứng dụng" };
-    public string AutoPlayLabel => CurrentLanguage switch { "English" => "Auto-play Audio", "Français" => "Lecture automatique", "中文" => "自动播放语音", "日本語" => "自動再生", _ => "Tự động phát âm thanh" };
-    public string VoiceSpeedLabel => CurrentLanguage switch { "English" => "Voice Speed", "Français" => "Vitesse de la voix", "中文" => "语音语速", "日本語" => "音声の速度", _ => "Tốc độ đọc" };
-    public string SaveButton => CurrentLanguage switch { "English" => "SAVE CHANGES", "Français" => "ENREGISTRER", "中文" => "保存更改", "日本語" => "変更を保存", _ => "LƯU THAY ĐỔI" };
+    public string SettingsTitle => CurrentLanguage switch { "English" => "SETTINGS", "Français" => "PARAMÈTRES", "中文" => "设置", "한국어" => "설정", _ => "CÀI ĐẶT" };
+    public string LanguageLabel => CurrentLanguage switch { "English" => "App Language", "Français" => "Langue de l'application", "中文" => "应用语言", "한국어" => "앱 언어", _ => "Ngôn ngữ ứng dụng" };
+    public string AutoPlayLabel => CurrentLanguage switch { "English" => "Auto-play Audio", "Français" => "Lecture automatique", "中文" => "自动播放语音", "한국어" => "자동 재생", _ => "Tự động phát âm thanh" };
+    public string VoiceSpeedLabel => CurrentLanguage switch { "English" => "Voice Speed", "Français" => "Vitesse de la voix", "中文" => "语音语速", "한국어" => "음성 속도", _ => "Tốc độ đọc" };
+    public string SaveButton => CurrentLanguage switch { "English" => "SAVE CHANGES", "Français" => "ENREGISTRER", "中文" => "保存更改", "한국어" => "저장", _ => "LƯU THAY ĐỔI" };
 
     // --- TỪ ĐIỂN TRANG BẢN ĐỒ ---
-    public string MapTitle => CurrentLanguage switch { "English" => "Tourist Map", "Français" => "Carte", "中文" => "地图", "日本語" => "マップ", _ => "Bản Đồ Du Lịch" };
-    public string ListenButton => CurrentLanguage switch { "English" => "Listen", "Français" => "Écouter", "中文" => "收听", "日本語" => "聞く", _ => "Nghe Thuyết Minh" };
-    public string StopButton => CurrentLanguage switch { "English" => "Stop", "Français" => "Arrêter", "中文" => "停止", "日本語" => "停止", _ => "Dừng" };
+    public string MapTitle => CurrentLanguage switch { "English" => "Tourist Map", "Français" => "Carte", "中文" => "地图", "한국어" => "지도", _ => "Bản Đồ Du Lịch" };
+    public string ListenButton => CurrentLanguage switch { "English" => "Listen", "Français" => "Écouter", "中文" => "收听", "한국어" => "듣기", _ => "Nghe Thuyết Minh" };
+    public string StopButton => CurrentLanguage switch { "English" => "Stop", "Français" => "Arrêter", "中文" => "停止", "한국어" => "중지", _ => "Dừng" };
 
     public event PropertyChangedEventHandler PropertyChanged;
     protected void OnPropertyChanged([CallerMemberName] string propertyName = null)

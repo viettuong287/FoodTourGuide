@@ -24,6 +24,7 @@ namespace VinhThucAudioGuide
 {
     public class POI
     {
+        public int Id { get; set; }
         public string Name { get; set; }
         public string Category { get; set; }
         public double Latitude { get; set; }
@@ -86,6 +87,7 @@ namespace VinhThucAudioGuide
             {
                 var poiMoi = new POI
                 {
+                    Id = loc.Id,
                     Name = loc.LocationName,
                     Category = loc.Category,
                     ImageUrl = loc.ImageUrl,
@@ -245,15 +247,21 @@ namespace VinhThucAudioGuide
 
             var selectedPoi = _selectedPoiForAudio;
 
-            string action = await DisplayActionSheet("Ngôn ngữ", "Hủy", null, "🇻🇳 Tiếng Việt", "🇹🇭 Tiếng Thái", "🇺🇸 Tiếng Anh (Mỹ)", "🇦🇺 Tiếng Anh (Úc)", "🇨🇦 Tiếng Anh (Canada)");
+            // Hiển thị 5 ngôn ngữ chuẩn: Việt, Anh, Pháp, Trung, Hàn
+            string action = await DisplayActionSheet("Ngôn ngữ", "Hủy", null,
+                "🇻🇳 Tiếng Việt",
+                "🇬🇧 English",
+                "🇫🇷 Français",
+                "🇨🇳 中文",
+                "🇰🇷 한국어");
             if (action == "Hủy" || string.IsNullOrEmpty(action)) return;
 
             string text = "", lang = "vi";
             if (action.Contains("Việt")) { text = selectedPoi.AudioScripts.GetValueOrDefault("vi", selectedPoi.Name); lang = "vi"; }
-            else if (action.Contains("Thái")) { text = selectedPoi.AudioScripts.GetValueOrDefault("th", selectedPoi.Name); lang = "th"; }
-            else if (action.Contains("Mỹ")) { text = selectedPoi.AudioScripts.GetValueOrDefault("en-US", selectedPoi.Name); lang = "en-US"; }
-            else if (action.Contains("Úc")) { text = selectedPoi.AudioScripts.GetValueOrDefault("en-AU", selectedPoi.Name); lang = "en-AU"; }
-            else if (action.Contains("Canada")) { text = selectedPoi.AudioScripts.GetValueOrDefault("en-CA", selectedPoi.Name); lang = "en-CA"; }
+            else if (action.Contains("English")) { text = selectedPoi.AudioScripts.GetValueOrDefault("en", selectedPoi.Name); lang = "en"; }
+            else if (action.Contains("Français")) { text = selectedPoi.AudioScripts.GetValueOrDefault("fr", selectedPoi.Name); lang = "fr"; }
+            else if (action.Contains("中文")) { text = selectedPoi.AudioScripts.GetValueOrDefault("zh", selectedPoi.Name); lang = "zh"; }
+            else if (action.Contains("한국어")) { text = selectedPoi.AudioScripts.GetValueOrDefault("ko", selectedPoi.Name); lang = "ko"; }
 
             _speechId++;
             int currentId = _speechId;
@@ -285,6 +293,18 @@ namespace VinhThucAudioGuide
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
+                // Try to fetch cached cloud TTS file for this POI
+                string cachedPath = await Services.AudioCacheService.GetOrFetchAudioAsync(_selectedPoiForAudio.Id, lang);
+                if (!string.IsNullOrEmpty(cachedPath) && File.Exists(cachedPath))
+                {
+                    // Play cached file
+                    _currentAudioPlayer?.Stop();
+                    _currentAudioPlayer = AudioManager.Current.CreatePlayer(cachedPath);
+                    _currentAudioPlayer.Play();
+                    return;
+                }
+
+                // If no cached file, try to stream/generate per-sentence and cache whole file when possible
                 foreach (var sentence in finalSentences)
                 {
                     if (currentId != _speechId) break;
@@ -292,13 +312,33 @@ namespace VinhThucAudioGuide
                     string cleanSentence = sentence.Trim();
                     if (string.IsNullOrEmpty(cleanSentence)) continue;
 
-                    string url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(cleanSentence)}&tl={lang}&client=tw-ob";
-                    var audioBytes = await client.GetByteArrayAsync(url);
+                    // Try to download full TTS for single sentence from cloud (server may support chunking)
+                    string ttsUrl = Preferences.Default.Get("RemoteApiBase", string.Empty);
+                    byte[] audioBytes = null;
+                    if (!string.IsNullOrWhiteSpace(ttsUrl))
+                    {
+                        try
+                        {
+                            var api = ttsUrl.TrimEnd('/') + $"/api/mobile/tts?locationId={_selectedPoiForAudio.Id}&lang={lang}&text=" + Uri.EscapeDataString(cleanSentence);
+                            var resp = await client.GetAsync(api);
+                            if (resp.IsSuccessStatusCode)
+                            {
+                                audioBytes = await resp.Content.ReadAsByteArrayAsync();
+                            }
+                        }
+                        catch { audioBytes = null; }
+                    }
+
+                    // Fallback to Google TTS (not ideal for production, but works)
+                    if (audioBytes == null || audioBytes.Length == 0)
+                    {
+                        var url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(cleanSentence)}&tl={lang}&client=tw-ob";
+                        audioBytes = await client.GetByteArrayAsync(url);
+                    }
 
                     if (currentId != _speechId) break;
 
                     _currentAudioPlayer?.Stop();
-
                     _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(audioBytes));
                     _currentAudioPlayer.Play();
 
@@ -309,10 +349,48 @@ namespace VinhThucAudioGuide
                         await Task.Delay(100);
                     }
                 }
+
+                // After successful stream, try to fetch and cache full audio for POI (best-effort)
+                try
+                {
+                    var apiBase = Preferences.Default.Get("RemoteApiBase", string.Empty);
+                    if (!string.IsNullOrWhiteSpace(apiBase))
+                    {
+                        var cachePath = await Services.AudioCacheService.GetOrFetchAudioAsync(_selectedPoiForAudio.Id, lang);
+                        // ignore result; cache method already writes file
+                    }
+                }
+                catch { }
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Lỗi âm thanh", "Không tải được tiếng! Chi tiết: " + ex.Message, "OK");
+                // No network / cloud failed -> fallback to native TTS via platform service
+                try
+                {
+                    var tts = Microsoft.Maui.Controls.DependencyService.Get<VinhThucAudioGuide.Services.IPlatformTts>();
+                    string locale = lang switch
+                    {
+                        "vi" => "vi-VN",
+                        "en" => "en-US",
+                        "fr" => "fr-FR",
+                        "zh" => "zh-CN",
+                        "ko" => "ko-KR",
+                        _ => "en-US"
+                    };
+
+                    if (tts != null)
+                    {
+                        tts.Speak(text, locale);
+                    }
+                    else
+                    {
+                        await DisplayAlert("Lỗi âm thanh", "Không có dịch vụ TTS trên thiết bị.", "OK");
+                    }
+                }
+                catch
+                {
+                    await DisplayAlert("Lỗi âm thanh", "Không thể phát âm thanh cả cloud lẫn native.", "OK");
+                }
             }
         }
 

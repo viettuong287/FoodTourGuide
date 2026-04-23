@@ -15,6 +15,50 @@ public partial class SettingsPage : ContentPage
         LoadSettings(); // Tải lại cài đặt cũ khi mở app
     }
 
+    private async void OnUpdateClicked(object sender, EventArgs e)
+    {
+        if (Preferences.Default.Get("LastUpdateCheck", DateTime.MinValue.ToString()) is string s && DateTime.TryParse(s, out var last))
+        {
+            // no-op, just read
+        }
+
+        // Thực hiện kiểm tra cập nhật dữ liệu từ Web API (địa chỉ API cần cấu hình)
+        try
+        {
+            BtnUpdate.IsEnabled = false;
+            BtnUpdate.Text = "Đang kiểm tra...";
+
+            // Ví dụ gọi API -> /api/mobile/locations (tùy backend), ở đây ta dùng HttpClient cơ bản
+            using var client = new System.Net.Http.HttpClient();
+            var apiUrl = Preferences.Default.Get("RemoteApiBase", "https://your-web-api.example.com");
+            var resp = await client.GetAsync($"{apiUrl.TrimEnd('/')}/api/mobile/locations");
+            if (!resp.IsSuccessStatusCode)
+            {
+                await DisplayAlert("Lỗi", "Không lấy được dữ liệu từ server.", "OK");
+                return;
+            }
+
+            var json = await resp.Content.ReadAsStringAsync();
+            var remoteList = System.Text.Json.JsonSerializer.Deserialize<List<Models.TourLocation>>(json);
+            if (remoteList == null) { await DisplayAlert("Lỗi", "Dữ liệu server rỗng.", "OK"); return; }
+
+            var db = new Services.LocalDbService();
+            int added = await db.UpsertTourLocations(remoteList);
+
+            Preferences.Default.Set("LastUpdateCheck", DateTime.UtcNow.ToString());
+            await DisplayAlert("Cập nhật", $"Đã đồng bộ xong. Thêm {added} địa điểm mới.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Lỗi", ex.Message, "OK");
+        }
+        finally
+        {
+            BtnUpdate.IsEnabled = true;
+            BtnUpdate.Text = LocalizationManager.Instance.CurrentLanguage == "Tiếng Việt" ? "Cập nhật mới" : "Check for updates";
+        }
+    }
+
     private void LoadSettings()
     {
         string lang = Preferences.Default.Get("AppLang", "Tiếng Việt");
@@ -75,9 +119,21 @@ public partial class SettingsPage : ContentPage
     {
         var btn = (Button)sender;
         string selectedFull = btn.Text; // VD: "🇻🇳 Tiếng Việt"
-        string selectedName = selectedFull.Substring(3).Trim(); // Cắt lấy "Tiếng Việt"
+        // Hỗ trợ emoji có thể là 2 codepoints, chuỗi bắt đầu bằng cờ + space
+        string selectedName = selectedFull.Contains(" ") ? selectedFull.Substring(selectedFull.IndexOf(' ')).Trim() : selectedFull;
 
-        LocalizationManager.Instance.CurrentLanguage = selectedName;
+        // Map display names to internal language keys used by LocalizationManager
+        string langKey = selectedName switch
+        {
+            "Tiếng Việt" => "Tiếng Việt",
+            "English" => "English",
+            "Français" => "Français",
+            "中文" => "中文",
+            "한국어" => "한국어",
+            _ => selectedName
+        };
+
+        LocalizationManager.Instance.CurrentLanguage = langKey;
         LblCurrentLang.Text = selectedFull; // Gắn luôn cờ lên giao diện
         UpdateUI();
         CloseLangMenu(null, null);

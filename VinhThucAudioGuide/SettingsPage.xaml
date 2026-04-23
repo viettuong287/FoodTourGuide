@@ -45,6 +45,7 @@
                 </Frame>
 
                 <Button x:Name="BtnSave" Clicked="OnSaveClicked" BackgroundColor="#0055CC" TextColor="White" FontAttributes="Bold" CornerRadius="15" HeightRequest="55" Margin="0,10,0,20"/>
+                <Button x:Name="BtnUpdate" Clicked="OnUpdateClicked" BackgroundColor="#388E3C" TextColor="White" FontAttributes="Bold" CornerRadius="15" HeightRequest="45" Margin="0,0,0,20" />
             </VerticalStackLayout>
         </ScrollView>
 
@@ -64,8 +65,9 @@
                 <BoxView HeightRequest="1" Color="#F0F0F0" />
                 <Button Text="🇨🇳 中文" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
                 <BoxView HeightRequest="1" Color="#F0F0F0" />
-                <Button Text="🇯🇵 日本語" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <Button Text="🇰🇷 한국어" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
             </VerticalStackLayout>
         </Frame>
     </Grid>
+
 </ContentPage>

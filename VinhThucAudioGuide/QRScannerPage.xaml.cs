@@ -31,7 +31,7 @@ public partial class QRScannerPage : ContentPage
             // Tắt camera ngay lập tức khi bắt được mã
             CameraReader.IsDetecting = false;
 
-            // KIỂM TRA MÃ VIP
+            // KIỂM TRA MÃ QR
             if (result.Value == "FOODTOUR_VIP_2026")
             {
                 Preferences.Default.Set("IsAppUnlocked", true);
