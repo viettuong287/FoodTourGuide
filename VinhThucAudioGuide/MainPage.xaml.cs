@@ -94,6 +94,16 @@ namespace VinhThucAudioGuide
                     Latitude = loc.Latitude,
                     Longitude = loc.Longitude
                 };
+                // Load per-location scripts (langCode -> content)
+                try
+                {
+                    var scripts = await dbService.GetScriptsForLocation(loc.Id);
+                    if (scripts != null && scripts.Count > 0)
+                    {
+                        poiMoi.AudioScripts = scripts;
+                    }
+                }
+                catch { }
                 _allPois.Add(poiMoi);
             }
 

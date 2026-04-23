@@ -7,8 +7,10 @@
 
     <Grid RowDefinitions="3*, Auto, Auto, Auto, 2*, Auto" Padding="25">
         <Grid Grid.Row="0">
-            <Image Source="travel_header.jpg" HeightRequest="220" VerticalOptions="Fill" HorizontalOptions="Fill" Aspect="AspectFill" />
-            <Image Source="logoapp.jpg" HeightRequest="100" WidthRequest="100" HorizontalOptions="Center" VerticalOptions="Center" />
+            <!-- Background image for home (not overlapping text) -->
+            <Image Source="trangchu.png" HeightRequest="220" VerticalOptions="Fill" HorizontalOptions="Fill" Aspect="AspectFill" Opacity="0.95" />
+            <!-- App logo centered but smaller so it doesn't cover text -->
+            <Image Source="logoapp.png" HeightRequest="80" WidthRequest="80" HorizontalOptions="Center" VerticalOptions="Center" />
         </Grid>
 
         <Label x:Name="LblTitle" Grid.Row="1" Text="Vĩnh Thực Audio Guide" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#0055CC"/>

@@ -46,6 +46,8 @@ public partial class SettingsPage : ContentPage
             int added = await db.UpsertTourLocations(remoteList);
 
             Preferences.Default.Set("LastUpdateCheck", DateTime.UtcNow.ToString());
+            // Update button text to show number of new items
+            BtnUpdate.Text = LocalizationManager.Instance.CurrentLanguage == "Tiếng Việt" ? $"Cập nhật mới ({added})" : $"Check for updates ({added})";
             await DisplayAlert("Cập nhật", $"Đã đồng bộ xong. Thêm {added} địa điểm mới.", "OK");
         }
         catch (Exception ex)

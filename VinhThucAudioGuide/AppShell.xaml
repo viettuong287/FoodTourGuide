@@ -6,7 +6,7 @@
     xmlns:local="clr-namespace:VinhThucAudioGuide"
     Shell.FlyoutBehavior="Disabled"
     BackgroundColor="#FFFFFF"
-    BackgroundImageSource="hinhnenapp.jpg">
+    BackgroundImageSource="hinhnen.png">
 
     <Shell.Resources>
         <ResourceDictionary>

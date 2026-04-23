@@ -125,6 +125,7 @@ public class LocalDbService
         return result;
     }
 
+
     private async Task SeedData()
     {
         // Nếu DB đã có dữ liệu rồi thì bỏ qua không nạp trùng
