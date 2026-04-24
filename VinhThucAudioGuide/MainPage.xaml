@@ -7,16 +7,6 @@
     <!-- Cấu trúc chia màn hình làm 5 phần -->
     <Grid RowDefinitions="Auto, 4*, Auto, 3*, Auto">
 
-        <!-- 1. HEADER (Thanh tiêu đề màu đỏ) -->
-        <Grid Grid.Row="0" BackgroundColor="#b71c1c" HeightRequest="45">
-            <Label Text="Phố Ẩm Thực Vĩnh Thực" 
-                   TextColor="White" 
-                   FontAttributes="Bold" 
-                   FontSize="18"
-                   HorizontalOptions="Center" 
-                   VerticalOptions="Center"/>
-        </Grid>
-
         <!-- 2. BẢN ĐỒ & NÚT GPS (Đã sửa thành Fill để tràn viền) -->
         <Grid Grid.Row="1">
             <mapsui:MapView x:Name="mapView" 
