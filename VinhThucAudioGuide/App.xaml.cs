@@ -5,6 +5,7 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        LocalizationManager.Instance.CurrentLanguage = Preferences.Default.Get("AppLang", "Tiếng Việt");
 
         // Kiểm tra xem đã được cấp phép chưa
         bool isUnlocked = Preferences.Default.Get("IsAppUnlocked", false);

@@ -2,6 +2,7 @@ using Microsoft.Maui;           // Trị lỗi Easing
 using Microsoft.Maui.Controls;  // Trị lỗi ContentPage, BoxView, Slider
 using Microsoft.Maui.Storage;   // Trị lỗi Preferences
 using System;
+using System.ComponentModel;
 
 namespace VinhThucAudioGuide;
 
@@ -15,8 +16,30 @@ public partial class SettingsPage : ContentPage
         LoadSettings(); // Tải lại cài đặt cũ khi mở app
     }
 
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        LocalizationManager.Instance.PropertyChanged += OnLocalizationChanged;
+        UpdateUI();
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        LocalizationManager.Instance.PropertyChanged -= OnLocalizationChanged;
+    }
+
+    private void OnLocalizationChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(LocalizationManager.CurrentLanguage))
+        {
+            MainThread.BeginInvokeOnMainThread(UpdateUI);
+        }
+    }
+
     private async void OnUpdateClicked(object sender, EventArgs e)
     {
+        var lm = LocalizationManager.Instance;
         if (Preferences.Default.Get("LastUpdateCheck", DateTime.MinValue.ToString()) is string s && DateTime.TryParse(s, out var last))
         {
             // no-op, just read
@@ -26,7 +49,7 @@ public partial class SettingsPage : ContentPage
         try
         {
             BtnUpdate.IsEnabled = false;
-            BtnUpdate.Text = "Đang kiểm tra...";
+            BtnUpdate.Text = lm.UpdatingButton;
 
             // Ví dụ gọi API -> /api/mobile/locations (tùy backend), ở đây ta dùng HttpClient cơ bản
             using var client = new System.Net.Http.HttpClient();
@@ -34,30 +57,29 @@ public partial class SettingsPage : ContentPage
             var resp = await client.GetAsync($"{apiUrl.TrimEnd('/')}/api/mobile/locations");
             if (!resp.IsSuccessStatusCode)
             {
-                await DisplayAlert("Lỗi", "Không lấy được dữ liệu từ server.", "OK");
+                await DisplayAlert(lm.ErrorTitle, lm.ServerFetchFailedMessage, lm.OkButton);
                 return;
             }
 
             var json = await resp.Content.ReadAsStringAsync();
             var remoteList = System.Text.Json.JsonSerializer.Deserialize<List<Models.TourLocation>>(json);
-            if (remoteList == null) { await DisplayAlert("Lỗi", "Dữ liệu server rỗng.", "OK"); return; }
+            if (remoteList == null) { await DisplayAlert(lm.ErrorTitle, lm.EmptyServerDataMessage, lm.OkButton); return; }
 
             var db = new Services.LocalDbService();
             int added = await db.UpsertTourLocations(remoteList);
 
             Preferences.Default.Set("LastUpdateCheck", DateTime.UtcNow.ToString());
-            // Update button text to show number of new items
-            BtnUpdate.Text = LocalizationManager.Instance.CurrentLanguage == "Tiếng Việt" ? $"Cập nhật mới ({added})" : $"Check for updates ({added})";
-            await DisplayAlert("Cập nhật", $"Đã đồng bộ xong. Thêm {added} địa điểm mới.", "OK");
+            BtnUpdate.Text = $"{lm.CheckUpdateButton} ({added})";
+            await DisplayAlert(lm.UpdateTitle, lm.UpdateSuccessMessage(added), lm.OkButton);
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Lỗi", ex.Message, "OK");
+            await DisplayAlert(lm.ErrorTitle, ex.Message, lm.OkButton);
         }
         finally
         {
             BtnUpdate.IsEnabled = true;
-            BtnUpdate.Text = LocalizationManager.Instance.CurrentLanguage == "Tiếng Việt" ? "Cập nhật mới" : "Check for updates";
+            BtnUpdate.Text = lm.CheckUpdateButton;
         }
     }
 
@@ -80,8 +102,8 @@ public partial class SettingsPage : ContentPage
         Preferences.Default.Set("AutoPlay", SwAutoPlay.IsToggled);
         Preferences.Default.Set("VoiceSpeed", SldSpeed.Value);
 
-        string msg = LocalizationManager.Instance.CurrentLanguage == "Tiếng Việt" ? "Lưu cài đặt thành công!" : "Saved successfully!";
-        DisplayAlert("Thành công", msg, "OK");
+        var lm = LocalizationManager.Instance;
+        DisplayAlert(lm.SuccessTitle, lm.SaveSuccessMessage, lm.OkButton);
     }
 
     private void OnSldSpeedChanged(object sender, ValueChangedEventArgs e)
@@ -144,14 +166,31 @@ public partial class SettingsPage : ContentPage
     private void UpdateUI()
     {
         var lm = LocalizationManager.Instance;
+        Title = lm.TabSettings;
         LblHeader.Text = lm.SettingsTitle;
         BtnSave.Text = lm.SaveButton;
+        BtnUpdate.Text = lm.CheckUpdateButton;
         LblLang.Text = lm.LanguageLabel;
         LblAuto.Text = lm.AutoPlayLabel;
         LblSpeed.Text = lm.VoiceSpeedLabel;
+        LblChooseLanguage.Text = lm.ChooseLanguageTitle;
+        BtnLangVi.Text = "🇻🇳 Tiếng Việt";
+        BtnLangEn.Text = "🇬🇧 English";
+        BtnLangFr.Text = "🇫🇷 Français";
+        BtnLangZh.Text = "🇨🇳 中文";
+        BtnLangKo.Text = "🇰🇷 한국어";
 
-        // Thêm 2 dòng này để dịch tiêu đề nhóm
-        GroupLang.Text = lm.CurrentLanguage == "Tiếng Việt" ? "NGÔN NGỮ" : "LANGUAGE";
-        GroupAudio.Text = lm.CurrentLanguage == "Tiếng Việt" ? "ÂM THANH & THUYẾT MINH" : "AUDIO & NARRATION";
+        GroupLang.Text = lm.GroupLanguage;
+        GroupAudio.Text = lm.GroupAudio;
+        LblCurrentLang.Text = GetLanguageDisplayWithFlag(lm.CurrentLanguage);
     }
+
+    private static string GetLanguageDisplayWithFlag(string langKey) => langKey switch
+    {
+        "English" => "🇬🇧 English",
+        "Français" => "🇫🇷 Français",
+        "中文" => "🇨🇳 中文",
+        "한국어" => "🇰🇷 한국어",
+        _ => "🇻🇳 Tiếng Việt"
+    };
 }

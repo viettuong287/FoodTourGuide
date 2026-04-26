@@ -1,6 +1,8 @@
 using ZXing.Net.Maui;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Storage;
 using System.Linq;
+using System.ComponentModel;
 using VinhThucAudioGuide.Services; // Gọi cái bộ não vào đây
 
 namespace VinhThucAudioGuide;
@@ -13,6 +15,7 @@ public partial class QrPage : ContentPage
     public QrPage()
     {
         InitializeComponent();
+        UpdateUI();
 
         // Khởi tạo Database ngay khi mở trang
         _dbService = new LocalDbService();
@@ -28,6 +31,8 @@ public partial class QrPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        LocalizationManager.Instance.PropertyChanged += OnLocalizationChanged;
+        UpdateUI();
         CameraReader.IsDetecting = true;
     }
 
@@ -35,6 +40,23 @@ public partial class QrPage : ContentPage
     {
         base.OnDisappearing();
         CameraReader.IsDetecting = false;
+        LocalizationManager.Instance.PropertyChanged -= OnLocalizationChanged;
+    }
+
+    private void OnLocalizationChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(LocalizationManager.CurrentLanguage))
+        {
+            MainThread.BeginInvokeOnMainThread(UpdateUI);
+        }
+    }
+
+    private void UpdateUI()
+    {
+        var lm = LocalizationManager.Instance;
+        Title = lm.TabQr;
+        LblScanTitle.Text = lm.QrScanTitle;
+        LblScanHint.Text = lm.QrScanHint;
     }
 
     private void CameraReader_BarcodesDetected(object sender, BarcodeDetectionEventArgs e)
@@ -49,18 +71,29 @@ public partial class QrPage : ContentPage
 
             string maQRKhachQuet = result.Value;
 
-            // Đem cái mã vừa quét đi hỏi Database (Tạm thời tìm bản Tiếng Việt - "vi")
-            var kichBan = await _dbService.GetScriptByQRAndLanguage(maQRKhachQuet, "vi");
+            var lm = LocalizationManager.Instance;
+            var langCode = Preferences.Default.Get("AppLang", "Tiếng Việt") switch
+            {
+                "English" => "en",
+                "Français" => "fr",
+                "中文" => "zh",
+                "한국어" => "ko",
+                _ => "vi"
+            };
+
+            var kichBan = await _dbService.GetScriptByQRAndLanguage(maQRKhachQuet, langCode);
+            if (kichBan == null && langCode != "vi")
+            {
+                kichBan = await _dbService.GetScriptByQRAndLanguage(maQRKhachQuet, "vi");
+            }
 
             if (kichBan != null)
             {
-                // NẾU TÌM THẤY TRONG DB: Đẩy tiêu đề và nội dung lên màn hình!
-                await DisplayAlert(kichBan.Title, kichBan.Content, "Tuyệt vời");
+                await DisplayAlert(kichBan.Title, kichBan.Content, lm.GreatButton);
             }
             else
             {
-                // NẾU MÃ BẬY BẠ HOẶC CHƯA CÓ TRONG DB
-                await DisplayAlert("Thông báo", "Địa điểm này chưa có thông tin thuyết minh!", "Quét lại");
+                await DisplayAlert(lm.NoticeTitle, lm.QrNoInfoMessage, lm.ScanAgainButton);
             }
 
             // Xử lý xong thì bật lại camera

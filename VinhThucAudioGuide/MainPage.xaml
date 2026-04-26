@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:mapsui="clr-namespace:Mapsui.UI.Maui;assembly=Mapsui.UI.Maui"
+             xmlns:local="clr-namespace:VinhThucAudioGuide"
              x:Class="VinhThucAudioGuide.MainPage">
 
     <!-- Cấu trúc chia màn hình làm 5 phần -->
@@ -30,9 +31,9 @@
 
         <!-- 3. BỘ LỌC DANH MỤC -->
         <HorizontalStackLayout Grid.Row="2" HorizontalOptions="Center" Spacing="15" Margin="0,15,0,10">
-            <Button Text="🍴 Thức ăn" BackgroundColor="#d4a017" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
-            <Button Text="🏛️ Vui chơi" BackgroundColor="#1565c0" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
-            <Button Text="🎉 Lễ hội" BackgroundColor="#6a1b9a" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
+            <Button x:Name="BtnFoodCategory" Text="🍴 Thức ăn" BackgroundColor="#d4a017" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
+            <Button x:Name="BtnFunCategory" Text="🏛️ Vui chơi" BackgroundColor="#1565c0" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
+            <Button x:Name="BtnFestivalCategory" Text="🎉 Lễ hội" BackgroundColor="#6a1b9a" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
         </HorizontalStackLayout>
 
         <!-- 4. DANH SÁCH ĐỊA ĐIỂM (Đã dùng Border thay Frame & Chống liệt cảm ứng) -->
@@ -66,9 +67,9 @@
                                     <Label Text="⭐" FontSize="12"/>
                                     <Label Text="{Binding Rating}" FontSize="13" TextColor="#d4a017" FontAttributes="Bold"/>
                                     <Label Text="•" FontSize="13" TextColor="#777777"/>
-                                    <Label Text="{Binding Category}" FontSize="13" TextColor="#777777"/>
+                                    <Label Text="{Binding DisplayCategory}" FontSize="13" TextColor="#777777"/>
                                 </HorizontalStackLayout>
-                                <Label Text="Nhấn để xem &amp; chỉ đường" FontSize="12" TextColor="#1976D2" FontAttributes="Italic"/>
+                                <Label Text="{Binding Source={x:Static local:LocalizationManager.Instance}, Path=TapToViewRoute}" FontSize="12" TextColor="#1976D2" FontAttributes="Italic"/>
                             </VerticalStackLayout>
                         </Grid>
                     </Border>
@@ -78,7 +79,7 @@
 
         <!-- 5. NÚT NGHE/DỪNG THUYẾT MINH -->
         <Grid Grid.Row="4" ColumnDefinitions="*, *" Margin="15,5,15,15" ColumnSpacing="15">
-            <Button Grid.Column="0" 
+            <Button x:Name="BtnListen" Grid.Column="0" 
                     Text="🎧 Nghe thuyết minh" 
                     BackgroundColor="#2e7d32" 
                     TextColor="White" 
@@ -87,7 +88,7 @@
                     HeightRequest="45"
                     Clicked="Speak_Clicked"/>
 
-            <Button Grid.Column="1" 
+            <Button x:Name="BtnStop" Grid.Column="1" 
                     Text="⏹️ Dừng" 
                     BackgroundColor="#c62828" 
                     TextColor="White" 

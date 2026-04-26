@@ -56,16 +56,16 @@
         </BoxView>
         <Frame x:Name="LangModal" VerticalOptions="End" TranslationY="600" Padding="20,20,20,40" CornerRadius="20" BackgroundColor="White">
             <VerticalStackLayout Spacing="10">
-                <Label Text="Chọn ngôn ngữ / Language" FontAttributes="Bold" FontSize="18" HorizontalOptions="Center" Margin="0,0,0,15" TextColor="Black"/>
-                <Button Text="🇻🇳 Tiếng Việt" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <Label x:Name="LblChooseLanguage" FontAttributes="Bold" FontSize="18" HorizontalOptions="Center" Margin="0,0,0,15" TextColor="Black"/>
+                <Button x:Name="BtnLangVi" Text="🇻🇳 Tiếng Việt" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
                 <BoxView HeightRequest="1" Color="#F0F0F0" />
-                <Button Text="🇬🇧 English" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <Button x:Name="BtnLangEn" Text="🇬🇧 English" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
                 <BoxView HeightRequest="1" Color="#F0F0F0" />
-                <Button Text="🇫🇷 Français" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <Button x:Name="BtnLangFr" Text="🇫🇷 Français" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
                 <BoxView HeightRequest="1" Color="#F0F0F0" />
-                <Button Text="🇨🇳 中文" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <Button x:Name="BtnLangZh" Text="🇨🇳 中文" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
                 <BoxView HeightRequest="1" Color="#F0F0F0" />
-                <Button Text="🇰🇷 한국어" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
+                <Button x:Name="BtnLangKo" Text="🇰🇷 한국어" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
             </VerticalStackLayout>
         </Frame>
     </Grid>

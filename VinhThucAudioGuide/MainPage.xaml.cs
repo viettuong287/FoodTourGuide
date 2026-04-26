@@ -13,6 +13,7 @@ using Microsoft.Maui.Media;
 using Microsoft.Maui.Storage;            // Dùng để đọc Preferences (Sổ tay cài đặt ngôn ngữ)
 using Plugin.Maui.Audio;
 using System;
+using System.ComponentModel;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -27,6 +28,7 @@ namespace VinhThucAudioGuide
         public int Id { get; set; }
         public string Name { get; set; }
         public string Category { get; set; }
+        public string DisplayCategory { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public string ImageUrl { get; set; }
@@ -43,6 +45,7 @@ namespace VinhThucAudioGuide
         private MemoryLayer _routeLayer;
         private int _speechId = 0;
         private POI _selectedPoiForAudio = null;
+        private string _activeCategoryFilter = string.Empty;
 
         //API key
         private readonly string ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjM4MTUxY2VmYzJmZDQ1ZDdhMGQ1NjYyN2ViMzlhZTNjIiwiaCI6Im11cm11cjY0In0=";
@@ -51,12 +54,52 @@ namespace VinhThucAudioGuide
         {
             InitializeComponent();
             InitMap();
+            UpdateLocalizedTexts();
             GetLocationAndCenter();
         }
         protected override async void OnAppearing()
         {
             base.OnAppearing();
+            LocalizationManager.Instance.PropertyChanged += OnLocalizationChanged;
+            UpdateLocalizedTexts();
             await LoadDataAsync(); // Nạp dữ liệu từ DB (Có await đàng hoàng)
+        }
+
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            LocalizationManager.Instance.PropertyChanged -= OnLocalizationChanged;
+        }
+
+        private void OnLocalizationChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(LocalizationManager.CurrentLanguage))
+            {
+                MainThread.BeginInvokeOnMainThread(UpdateLocalizedTexts);
+            }
+        }
+
+        private void UpdateLocalizedTexts()
+        {
+            var lm = LocalizationManager.Instance;
+            Title = lm.MapTitle;
+            btnGps.Text = lm.GpsButton;
+            BtnFoodCategory.Text = lm.FoodCategory;
+            BtnFunCategory.Text = lm.FunCategory;
+            BtnFestivalCategory.Text = lm.FestivalCategory;
+            BtnListen.Text = lm.ListenButton;
+            BtnStop.Text = lm.StopButton;
+            RefreshLocalizedPoiCategories();
+            ApplyCategoryFilter();
+        }
+
+        private void RefreshLocalizedPoiCategories()
+        {
+            var lm = LocalizationManager.Instance;
+            foreach (var poi in _allPois)
+            {
+                poi.DisplayCategory = lm.LocalizeCategory(poi.Category ?? string.Empty);
+            }
         }
 
         private void InitMap()
@@ -90,6 +133,7 @@ namespace VinhThucAudioGuide
                     Id = loc.Id,
                     Name = loc.LocationName,
                     Category = loc.Category,
+                    DisplayCategory = LocalizationManager.Instance.LocalizeCategory(loc.Category ?? string.Empty),
                     ImageUrl = loc.ImageUrl,
                     Latitude = loc.Latitude,
                     Longitude = loc.Longitude
@@ -115,7 +159,7 @@ namespace VinhThucAudioGuide
                 mapView.Refresh();
 
                 // Bơm 5 địa điểm ra cái danh sách cvPoiList có sẵn của sếp!
-                cvPoiList.ItemsSource = _allPois;
+                ApplyCategoryFilter();
             });
         }
 
@@ -131,7 +175,8 @@ namespace VinhThucAudioGuide
                     status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
                     if (status != PermissionStatus.Granted)
                     {
-                        await DisplayAlert("Thiếu quyền", "Bro phải cho phép app dùng vị trí thì mới lấy được GPS nhé!", "OK");
+                        var lm = LocalizationManager.Instance;
+                        await DisplayAlert(lm.PermissionRequiredTitle, lm.PermissionRequiredMessage, lm.OkButton);
                         return;
                     }
                 }
@@ -150,7 +195,8 @@ namespace VinhThucAudioGuide
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Lỗi GPS", "Không lấy được vị trí. Nhớ bật GPS (Vị trí) trên điện thoại nha bro!\n" + ex.Message, "OK");
+                var lm = LocalizationManager.Instance;
+                await DisplayAlert(lm.GpsErrorTitle, $"{lm.GpsFetchFailedMessage}\n{ex.Message}", lm.OkButton);
             }
         }
 
@@ -162,23 +208,25 @@ namespace VinhThucAudioGuide
         private void Category_Clicked(object sender, EventArgs e)
         {
             var btn = sender as Button;
-            // Chuẩn hoá nhãn nút thành 3 category chuẩn của app
-            var text = (btn?.Text ?? string.Empty).ToLowerInvariant();
-            string category;
-            if (text.Contains("thức") || text.Contains("ẩm") || text.Contains("🍴")) category = "Thức ăn";
-            else if (text.Contains("vui") || text.Contains("du lịch") || text.Contains("🏛")) category = "Vui chơi";
-            else if (text.Contains("lễ") || text.Contains("sự kiện") || text.Contains("🎉")) category = "Lễ hội";
-            else category = string.Empty;
+            if (btn == BtnFoodCategory) _activeCategoryFilter = "Thức ăn";
+            else if (btn == BtnFunCategory) _activeCategoryFilter = "Vui chơi";
+            else if (btn == BtnFestivalCategory) _activeCategoryFilter = "Lễ hội";
+            else _activeCategoryFilter = string.Empty;
 
-            if (string.IsNullOrEmpty(category))
+            ApplyCategoryFilter();
+        }
+
+        private void ApplyCategoryFilter()
+        {
+            if (string.IsNullOrEmpty(_activeCategoryFilter))
             {
-                // nếu không nhận diện được, hiện tất cả
-                cvPoiList.ItemsSource = _allPois;
+                cvPoiList.ItemsSource = _allPois.ToList();
+                return;
             }
-            else
-            {
-                cvPoiList.ItemsSource = _allPois.Where(p => (p.Category ?? string.Empty) == category).ToList();
-            }
+
+            cvPoiList.ItemsSource = _allPois
+                .Where(p => (p.Category ?? string.Empty) == _activeCategoryFilter)
+                .ToList();
         }
 
         private async void Poi_Selected(object sender, SelectionChangedEventArgs e)
@@ -203,7 +251,8 @@ namespace VinhThucAudioGuide
 
             if (ORS_API_KEY == "ĐIỀN_API_KEY_CỦA_BRO_VÀO_ĐÂY")
             {
-                await DisplayAlert("Lỗi", "Bro chưa dán API Key vào dòng 37 kìa!", "OK");
+                var lm = LocalizationManager.Instance;
+                await DisplayAlert(lm.ErrorTitle, lm.ApiKeyMissingMessage, lm.OkButton);
                 return;
             }
 
@@ -247,24 +296,31 @@ namespace VinhThucAudioGuide
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Lỗi chỉ đường", "Không vẽ được đường. Kiểm tra lại API Key hoặc Mạng nhé!\nChi tiết: " + ex.Message, "OK");
+                var lm = LocalizationManager.Instance;
+                await DisplayAlert(lm.RouteErrorTitle, $"{lm.RouteDrawFailedMessage}\n{lm.DetailPrefix}: {ex.Message}", lm.OkButton);
             }
         }
 
         private async void Speak_Clicked(object sender, EventArgs e) //thuyết minh
         {
-            if (_selectedPoiForAudio == null) { await DisplayAlert("Thông báo", "Chọn quán ăn trong danh sách trước nhé!", "OK"); return; }
+            if (_selectedPoiForAudio == null)
+            {
+                var lmNotice = LocalizationManager.Instance;
+                await DisplayAlert(lmNotice.NoticeTitle, lmNotice.SelectPoiNotice, lmNotice.OkButton);
+                return;
+            }
 
             var selectedPoi = _selectedPoiForAudio;
 
             // Hiển thị 5 ngôn ngữ chuẩn: Việt, Anh, Pháp, Trung, Hàn
-            string action = await DisplayActionSheet("Ngôn ngữ", "Hủy", null,
+            var lm = LocalizationManager.Instance;
+            string action = await DisplayActionSheet(lm.LanguageActionSheetTitle, lm.CancelButton, null,
                 "🇻🇳 Tiếng Việt",
                 "🇬🇧 English",
                 "🇫🇷 Français",
                 "🇨🇳 中文",
                 "🇰🇷 한국어");
-            if (action == "Hủy" || string.IsNullOrEmpty(action)) return;
+            if (action == lm.CancelButton || string.IsNullOrEmpty(action)) return;
 
             string text = "", lang = "vi";
             if (action.Contains("Việt")) { text = selectedPoi.AudioScripts.GetValueOrDefault("vi", selectedPoi.Name); lang = "vi"; }
@@ -394,12 +450,14 @@ namespace VinhThucAudioGuide
                     }
                     else
                     {
-                        await DisplayAlert("Lỗi âm thanh", "Không có dịch vụ TTS trên thiết bị.", "OK");
+                        var lmError = LocalizationManager.Instance;
+                        await DisplayAlert(lmError.AudioErrorTitle, lmError.TtsServiceUnavailableMessage, lmError.OkButton);
                     }
                 }
                 catch
                 {
-                    await DisplayAlert("Lỗi âm thanh", "Không thể phát âm thanh cả cloud lẫn native.", "OK");
+                    var lmError = LocalizationManager.Instance;
+                    await DisplayAlert(lmError.AudioErrorTitle, lmError.TtsPlaybackFailedMessage, lmError.OkButton);
                 }
             }
         }
@@ -415,26 +473,26 @@ namespace VinhThucAudioGuide
 
         private void Filter_All_Clicked(object sender, EventArgs e)
         {
-            // Hiện tất cả
-            cvPoiList.ItemsSource = _allPois;
+            _activeCategoryFilter = string.Empty;
+            ApplyCategoryFilter();
         }
 
         private void Filter_Food_Clicked(object sender, EventArgs e)
         {
-            // Lọc Thức ăn (Sườn bì chưởng, Bánh mì Huỳnh Hoa)
-            cvPoiList.ItemsSource = _allPois.Where(x => x.Category == "Thức ăn").ToList();
+            _activeCategoryFilter = "Thức ăn";
+            ApplyCategoryFilter();
         }
 
         private void Filter_Travel_Clicked(object sender, EventArgs e)
         {
-            // Lọc Vui chơi (Công viên Sáng Tạo, Tao Đàn)
-            cvPoiList.ItemsSource = _allPois.Where(x => x.Category == "Vui chơi").ToList();
+            _activeCategoryFilter = "Vui chơi";
+            ApplyCategoryFilter();
         }
 
         private void Filter_Event_Clicked(object sender, EventArgs e)
         {
-            // Lọc Lễ hội (Phố Lồng Đèn)
-            cvPoiList.ItemsSource = _allPois.Where(x => x.Category == "Lễ hội").ToList();
+            _activeCategoryFilter = "Lễ hội";
+            ApplyCategoryFilter();
         }   
     }
 

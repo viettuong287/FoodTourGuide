@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
              x:Class="VinhThucAudioGuide.QRScannerPage"
-             Title="Quét Vé"
              NavigationPage.HasNavigationBar="False">
 
     <Grid>
@@ -29,7 +28,7 @@
         </Grid>
 
         <VerticalStackLayout Margin="0,60,0,0" HorizontalOptions="Center">
-            <Label Text="Đưa mã QR vào trung tâm hộp" 
+            <Label x:Name="LblTicketScanTitle"
                    TextColor="White" 
                    FontSize="18" 
                    FontAttributes="Bold" />

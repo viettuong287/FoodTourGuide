@@ -2,25 +2,42 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="VinhThucAudioGuide.HomePage"
-             Title="Trang chủ"
-             BackgroundColor="#F5F7FA">
+             BackgroundColor="Black">
 
-    <Grid RowDefinitions="3*, Auto, Auto, Auto, 2*, Auto" Padding="25">
-        <Grid Grid.Row="0">
-            <!-- Background image for home (not overlapping text) -->
-            <Image Source="trangchu.png" HeightRequest="220" VerticalOptions="Fill" HorizontalOptions="Fill" Aspect="AspectFill" Opacity="0.95" />
-            <!-- App logo centered but smaller so it doesn't cover text -->
-            <Image Source="logoapp.png" HeightRequest="80" WidthRequest="80" HorizontalOptions="Center" VerticalOptions="Center" />
-        </Grid>
+    <Grid>
+        <Image Source="trangchu.jpg" Aspect="AspectFill" />
+        <BoxView Color="Black" Opacity="0.25" />
 
-        <Label x:Name="LblTitle" Grid.Row="1" Text="Vĩnh Thực Audio Guide" FontSize="28" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#0055CC"/>
-        <Label x:Name="LblDesc" Grid.Row="2" Text="Khám phá vẻ đẹp biển đảo qua từng câu chuyện kể tự động." 
-               HorizontalTextAlignment="Center" FontSize="16" TextColor="#4A4A4A" Margin="0,15,0,0" LineHeight="1.3"/>
-        <Image Grid.Row="3" Source="trangchu.jpg" HeightRequest="120" Aspect="AspectFill" HorizontalOptions="Center" Margin="0,10" />
-        <Label Grid.Row="4" Text="v1.0.0" FontSize="13" HorizontalOptions="Center" TextColor="Gray" Margin="0,10,0,0"/>
+        <ScrollView>
+            <VerticalStackLayout Padding="25" Spacing="16" VerticalOptions="Center">
+                <Frame Padding="20" CornerRadius="18" HasShadow="False" BackgroundColor="#EEFFFFFF" BorderColor="#33FFFFFF">
+                    <VerticalStackLayout Spacing="12">
+                        <Label x:Name="LblTitle"
+                               FontSize="28"
+                               FontAttributes="Bold"
+                               HorizontalTextAlignment="Center"
+                               TextColor="#A00000"/>
+                        <Label x:Name="LblDesc"
+                               HorizontalTextAlignment="Center"
+                               FontSize="16"
+                               TextColor="#2E2E2E"
+                               LineHeight="1.3"/>
+                        <Label Text="v1.0.0"
+                               FontSize="13"
+                               HorizontalOptions="Center"
+                               TextColor="#606060" />
+                    </VerticalStackLayout>
+                </Frame>
 
-        <Button Grid.Row="5" x:Name="BtnStart" Text="BẮT ĐẦU HÀNH TRÌNH" BackgroundColor="#0055CC" TextColor="White" 
-                FontAttributes="Bold" CornerRadius="15" HeightRequest="55" Margin="0,0,0,20"
-                Clicked="BtnGoToMap_Clicked"/>
+                <Button Grid.Row="5" x:Name="BtnStart"
+                        BackgroundColor="#0055CC"
+                        TextColor="White"
+                        FontAttributes="Bold"
+                        CornerRadius="15"
+                        HeightRequest="55"
+                        Margin="0,8,0,20"
+                        Clicked="BtnGoToMap_Clicked"/>
+            </VerticalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>
