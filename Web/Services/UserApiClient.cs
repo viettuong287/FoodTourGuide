@@ -41,7 +41,7 @@ namespace Web.Services
             Guid userId,
             CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.PutAsJsonAsync($"api/user/{userId}/toggle-active", new { }, cancellationToken);
+            var response = await _httpClient.PatchAsJsonAsync($"api/user/{userId}/toggle-active", new { }, cancellationToken);
             return await response.Content.ReadFromJsonAsync<ApiResult<object>>(cancellationToken: cancellationToken);
         }
 

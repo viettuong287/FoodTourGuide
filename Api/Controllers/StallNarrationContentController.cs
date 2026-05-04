@@ -1,3 +1,4 @@
+using Api.Application.Services;
 using Api.Authorization;
 using Api.Domain.Entities;
 using Api.Extensions;
@@ -477,18 +478,8 @@ namespace Api.Controllers
             if (!IsAdmin() && content.Stall.Business.OwnerUserId != userId)
                 return this.ForbiddenResult("Không có quyền truy cập");
 
-            var allowedStatuses = new[] { TtsJobStatus.Failed, TtsJobStatus.Completed };
-            if (!allowedStatuses.Contains(content.TtsStatus))
-                return this.BadRequestResult("Chỉ có thể thử lại khi TTS ở trạng thái Failed hoặc Completed.");
-
-            // Kiểm tra nếu đã Completed nhưng không có audio thì cũng cho phép retry
-            if (content.TtsStatus == TtsJobStatus.Completed)
-            {
-                var hasAudio = await _context.NarrationAudios
-                    .AnyAsync(a => a.NarrationContentId == id);
-                if (hasAudio)
-                    return this.BadRequestResult("TTS đã hoàn thành và có audio. Không cần thử lại.");
-            }
+            if (content.TtsStatus != TtsJobStatus.Failed)
+                return this.BadRequestResult("Chỉ có thể thử lại khi TTS đang ở trạng thái Failed.");
 
             content.TtsStatus = TtsJobStatus.Pending;
             content.TtsError  = null;

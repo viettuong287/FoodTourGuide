@@ -212,7 +212,7 @@ namespace Web.Controllers
             QrCodeCreateDto model, int page = 1, int pageSize = 20,
             CancellationToken cancellationToken = default)
         {
-            if (!ModelState.IsValid || model.ExpiryAt <= DateTime.UtcNow)
+            if (!ModelState.IsValid || model.ValidDays <= 0)
             {
                 var result = await _qrCodeApiClient.GetQrCodesAsync(page, pageSize, ct: cancellationToken);
                 var items = result?.Data?.Items?.ToList() ?? [];
@@ -225,7 +225,7 @@ namespace Web.Controllers
                     TotalUsed = items.Count(q => q.IsUsed),
                     Create = model,
                     ShowCreateModal = true,
-                    ErrorMessage = "Ngày hết hạn không hợp lệ."
+                    ErrorMessage = "Số ngày hiệu lực phải lớn hơn 0."
                 };
                 return View("QrCodes", vm);
             }

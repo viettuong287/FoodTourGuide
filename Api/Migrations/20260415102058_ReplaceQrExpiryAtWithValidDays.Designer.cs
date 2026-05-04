@@ -4,6 +4,7 @@ using Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260415102058_ReplaceQrExpiryAtWithValidDays")]
+    partial class ReplaceQrExpiryAtWithValidDays
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -172,11 +175,6 @@ namespace Api.Migrations
                     b.Property<string>("Manufacturer")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
-
-                    b.Property<bool>("NeedsReset")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
 
                     b.Property<string>("OsVersion")
                         .HasMaxLength(64)
@@ -527,6 +525,13 @@ namespace Api.Migrations
                             ConcurrencyStamp = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
                             Name = "BusinessOwner",
                             NormalizedName = "BUSINESSOWNER"
+                        },
+                        new
+                        {
+                            Id = new Guid("33333333-3333-3333-3333-333333333333"),
+                            ConcurrencyStamp = "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                            Name = "User",
+                            NormalizedName = "USER"
                         });
                 });
 
@@ -858,87 +863,6 @@ namespace Api.Migrations
                     b.HasIndex("BusinessId");
 
                     b.ToTable("SubscriptionOrders", (string)null);
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.Tour", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset")
-                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
-
-                    b.Property<int?>("EstimatedMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("IsActive");
-
-                    b.ToTable("Tours", (string)null);
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.TourStop", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset")
-                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("StallId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("TourId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StallId");
-
-                    b.HasIndex("TourId", "Order");
-
-                    b.HasIndex("TourId", "StallId")
-                        .IsUnique();
-
-                    b.ToTable("TourStops", (string)null);
                 });
 
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>
@@ -1483,6 +1407,107 @@ namespace Api.Migrations
                     b.ToTable("UserRoles", (string)null);
                 });
 
+            modelBuilder.Entity("Api.Domain.Entities.VisitorLocationLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<decimal?>("AccuracyMeters")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTime>("CapturedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<decimal>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<decimal>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("decimal(9,6)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("VisitorLocationLogs", (string)null);
+                });
+
+            modelBuilder.Entity("Api.Domain.Entities.VisitorPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<bool>("AutoPlay")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<Guid>("LanguageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("SpeechRate")
+                        .HasPrecision(4, 2)
+                        .HasColumnType("decimal(4,2)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Voice")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LanguageId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("VisitorPreferences", (string)null);
+                });
+
+            modelBuilder.Entity("Api.Domain.Entities.VisitorProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2(3)")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<Guid>("LanguageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LanguageId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("VisitorProfiles", (string)null);
+                });
+
             modelBuilder.Entity("LocateAndMultilingualNarration.Domain.Entities.QrCode", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1681,36 +1706,6 @@ namespace Api.Migrations
                     b.Navigation("Business");
                 });
 
-            modelBuilder.Entity("Api.Domain.Entities.Tour", b =>
-                {
-                    b.HasOne("Api.Domain.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.TourStop", b =>
-                {
-                    b.HasOne("Api.Domain.Entities.Stall", "Stall")
-                        .WithMany()
-                        .HasForeignKey("StallId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Api.Domain.Entities.Tour", "Tour")
-                        .WithMany("Stops")
-                        .HasForeignKey("TourId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Stall");
-
-                    b.Navigation("Tour");
-                });
-
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>
                 {
                     b.HasOne("Api.Domain.Entities.Language", "Language")
@@ -1741,6 +1736,55 @@ namespace Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Api.Domain.Entities.VisitorLocationLog", b =>
+                {
+                    b.HasOne("Api.Domain.Entities.User", "User")
+                        .WithMany("VisitorLocationLogs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Api.Domain.Entities.VisitorPreference", b =>
+                {
+                    b.HasOne("Api.Domain.Entities.Language", "Language")
+                        .WithMany("VisitorPreferences")
+                        .HasForeignKey("LanguageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Api.Domain.Entities.User", "User")
+                        .WithOne("VisitorPreference")
+                        .HasForeignKey("Api.Domain.Entities.VisitorPreference", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Language");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Api.Domain.Entities.VisitorProfile", b =>
+                {
+                    b.HasOne("Api.Domain.Entities.Language", "Language")
+                        .WithMany("VisitorProfiles")
+                        .HasForeignKey("LanguageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Api.Domain.Entities.User", "User")
+                        .WithOne("VisitorProfile")
+                        .HasForeignKey("Api.Domain.Entities.VisitorProfile", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Language");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Api.Domain.Entities.Business", b =>
                 {
                     b.Navigation("Stalls");
@@ -1753,6 +1797,10 @@ namespace Api.Migrations
                     b.Navigation("StallNarrationContents");
 
                     b.Navigation("TtsVoiceProfiles");
+
+                    b.Navigation("VisitorPreferences");
+
+                    b.Navigation("VisitorProfiles");
                 });
 
             modelBuilder.Entity("Api.Domain.Entities.Role", b =>
@@ -1776,11 +1824,6 @@ namespace Api.Migrations
                     b.Navigation("NarrationAudios");
                 });
 
-            modelBuilder.Entity("Api.Domain.Entities.Tour", b =>
-                {
-                    b.Navigation("Stops");
-                });
-
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>
                 {
                     b.Navigation("NarrationAudios");
@@ -1797,6 +1840,12 @@ namespace Api.Migrations
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("UserRoles");
+
+                    b.Navigation("VisitorLocationLogs");
+
+                    b.Navigation("VisitorPreference");
+
+                    b.Navigation("VisitorProfile");
                 });
 #pragma warning restore 612, 618
         }

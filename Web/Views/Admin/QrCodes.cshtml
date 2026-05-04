@@ -193,7 +193,7 @@
 
 <!-- Stat Cards -->
 @{
-    var totalExpired = Model.Items.Count(q => !q.IsUsed && q.ExpiryAt < now);
+    var totalExpired = Model.Items.Count(q => q.IsUsed && q.AccessExpiresAt.HasValue && q.AccessExpiresAt.Value < now);
 }
 <div class="stats-row anim-2">
     <div class="stat-card">
@@ -289,8 +289,8 @@
                     var rowNum = startIndex;
                     foreach (var q in Model.Items)
                     {
-                        var isExpired  = !q.IsUsed && q.ExpiryAt < now;
-                        var isSoon     = !q.IsUsed && !isExpired && q.ExpiryAt < now.AddDays(3);
+                        var isExpired  = q.IsUsed && q.AccessExpiresAt.HasValue && q.AccessExpiresAt.Value < now;
+                        var isSoon     = q.IsUsed && q.AccessExpiresAt.HasValue && q.AccessExpiresAt.Value >= now && q.AccessExpiresAt.Value < now.AddDays(3);
                         var expiryCls  = isExpired ? "expiry-passed" : isSoon ? "expiry-soon" : "expiry-ok";
                         var rowCls     = q.IsUsed ? "row-used" : "";
 
@@ -326,14 +326,22 @@
                                 }
                             </td>
                             <td>
-                                <div class="date-main @expiryCls">
-                                    @q.ExpiryAt.ToLocalTime().ToString("dd/MM/yyyy")
-                                </div>
-                                <div class="date-sub @expiryCls">
-                                    @q.ExpiryAt.ToLocalTime().ToString("HH:mm")
-                                    @if (isSoon) { <text> · Sắp hết</text> }
-                                    @if (isExpired) { <text> · Đã hết</text> }
-                                </div>
+                                @if (q.AccessExpiresAt.HasValue)
+                                {
+                                    <div class="date-main @expiryCls">
+                                        @q.AccessExpiresAt.Value.ToLocalTime().ToString("dd/MM/yyyy")
+                                    </div>
+                                    <div class="date-sub @expiryCls">
+                                        @q.AccessExpiresAt.Value.ToLocalTime().ToString("HH:mm")
+                                        @if (isSoon) { <text> · Sắp hết</text> }
+                                        @if (isExpired) { <text> · Đã hết</text> }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="date-main" style="color:var(--text-light);">@q.ValidDays ngày</div>
+                                    <div class="date-sub">sau khi quét</div>
+                                }
                             </td>
                             <td>
                                 <div class="date-main">@q.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</div>
@@ -479,14 +487,14 @@
                 <input type="hidden" name="pageSize" value="@Model.PageSize" />
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Hạn sử dụng <span class="text-danger">*</span></label>
-                        <input type="datetime-local"
-                               name="ExpiryAt"
+                        <label class="form-label">Hiệu lực (ngày) <span class="text-danger">*</span></label>
+                        <input type="number"
+                               name="ValidDays"
                                class="form-control"
-                               value="@(Model.Create.ExpiryAt > DateTime.MinValue ? Model.Create.ExpiryAt.ToString("yyyy-MM-ddTHH:mm") : DateTime.UtcNow.AddDays(30).ToString("yyyy-MM-ddTHH:mm"))"
-                               min="@DateTime.UtcNow.AddMinutes(1).ToString("yyyy-MM-ddTHH:mm")"
+                               value="@(Model.Create.ValidDays > 0 ? Model.Create.ValidDays : 30)"
+                               min="1"
                                required />
-                        <div class="form-text">Thời điểm mã hết hiệu lực.</div>
+                        <div class="form-text">Số ngày được phép truy cập sau khi quét mã.</div>
                     </div>
                     <div class="mb-1">
                         <label class="form-label">Ghi chú</label>

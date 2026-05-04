@@ -179,7 +179,7 @@ namespace Api.Controllers
         /// <response code="403">Không có quyền truy cập</response>
         [HttpGet]
         [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
-        public async Task<IActionResult> GetBusinesses([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null, [FromQuery] string? sortBy = null, [FromQuery] string? sortDir = null)
+        public async Task<IActionResult> GetBusinesses([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null, [FromQuery] string? sortBy = null, [FromQuery] string? sortDir = null, [FromQuery] string? plan = null)
         {
             _logger.LogInformation("Bắt đầu lấy danh sách business - Page: {Page}, PageSize: {PageSize}", page, pageSize);
 
@@ -203,6 +203,11 @@ namespace Api.Controllers
             {
                 var keyword = search.Trim();
                 query = query.Where(b => b.Name.Contains(keyword) || (b.TaxCode != null && b.TaxCode.Contains(keyword)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(plan))
+            {
+                query = query.Where(b => b.Plan == plan);
             }
 
             _logger.LogDebug("Truy vấn danh sách business - UserId: {UserId}", userId);
@@ -261,6 +266,36 @@ namespace Api.Controllers
                 Plan = business.Plan,
                 PlanExpiresAt = business.PlanExpiresAt
             };
+        }
+
+        /// <summary>
+        /// Kích hoạt hoặc vô hiệu hóa business
+        /// </summary>
+        /// <param name="id">Id của business</param>
+        /// <returns>Business sau khi cập nhật trạng thái</returns>
+        /// <response code="200">Cập nhật thành công</response>
+        /// <response code="401">Không xác thực</response>
+        /// <response code="403">Không có quyền truy cập</response>
+        /// <response code="404">Không tìm thấy business</response>
+        [HttpPatch("{id:guid}/toggle-active")]
+        [Authorize(Policy = AppPolicies.AdminOrBusinessOwner)]
+        public async Task<IActionResult> ToggleActive(Guid id)
+        {
+            if (!TryGetUserId(out var userId))
+                return this.UnauthorizedResult("Không xác thực");
+
+            var business = await _context.Businesses.FirstOrDefaultAsync(b => b.Id == id);
+            if (business == null)
+                return this.NotFoundResult("Không tìm thấy business");
+
+            if (!IsAdmin() && business.OwnerUserId != userId)
+                return this.ForbiddenResult("Không có quyền truy cập");
+
+            business.IsActive = !business.IsActive;
+            await _context.SaveChangesAsync();
+
+            var timeZone = GetTimeZone();
+            return this.OkResult(MapBusinessDetail(business, timeZone));
         }
 
         /// <summary>

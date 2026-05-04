@@ -4,6 +4,7 @@ using Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260418165932_AddDevicePreferenceNeedsReset")]
+    partial class AddDevicePreferenceNeedsReset
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -860,87 +863,6 @@ namespace Api.Migrations
                     b.ToTable("SubscriptionOrders", (string)null);
                 });
 
-            modelBuilder.Entity("Api.Domain.Entities.Tour", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset")
-                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
-
-                    b.Property<int?>("EstimatedMinutes")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("IsActive");
-
-                    b.ToTable("Tours", (string)null);
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.TourStop", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("NEWSEQUENTIALID()");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetimeoffset")
-                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("StallId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("TourId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StallId");
-
-                    b.HasIndex("TourId", "Order");
-
-                    b.HasIndex("TourId", "StallId")
-                        .IsUnique();
-
-                    b.ToTable("TourStops", (string)null);
-                });
-
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1681,36 +1603,6 @@ namespace Api.Migrations
                     b.Navigation("Business");
                 });
 
-            modelBuilder.Entity("Api.Domain.Entities.Tour", b =>
-                {
-                    b.HasOne("Api.Domain.Entities.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.TourStop", b =>
-                {
-                    b.HasOne("Api.Domain.Entities.Stall", "Stall")
-                        .WithMany()
-                        .HasForeignKey("StallId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Api.Domain.Entities.Tour", "Tour")
-                        .WithMany("Stops")
-                        .HasForeignKey("TourId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Stall");
-
-                    b.Navigation("Tour");
-                });
-
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>
                 {
                     b.HasOne("Api.Domain.Entities.Language", "Language")
@@ -1774,11 +1666,6 @@ namespace Api.Migrations
             modelBuilder.Entity("Api.Domain.Entities.StallNarrationContent", b =>
                 {
                     b.Navigation("NarrationAudios");
-                });
-
-            modelBuilder.Entity("Api.Domain.Entities.Tour", b =>
-                {
-                    b.Navigation("Stops");
                 });
 
             modelBuilder.Entity("Api.Domain.Entities.TtsVoiceProfile", b =>

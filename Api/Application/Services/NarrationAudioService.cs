@@ -1,10 +1,11 @@
+using System.Security;
+using System.Text;
 using Api.Domain.Entities;
 using Api.Domain.Settings;
 using Api.Infrastructure.Persistence;
 using Api.Infrastructure.Persistence.Extensions;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Microsoft.CognitiveServices.Speech;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -30,17 +31,16 @@ namespace Api.Application.Services
         private readonly AzureSpeechSettings _speechSettings;
         private readonly BlobStorageSettings _blobSettings;
         private readonly ITranslationService _translationService;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<NarrationAudioService> _logger;
 
-        /// <summary>
-        /// Khởi tạo service với DbContext, cấu hình Speech/Blob và logger.
-        /// </summary>
-        public NarrationAudioService(AppDbContext context, IOptions<AzureSpeechSettings> speechSettings, IOptions<BlobStorageSettings> blobSettings, ITranslationService translationService, ILogger<NarrationAudioService> logger)
+        public NarrationAudioService(AppDbContext context, IOptions<AzureSpeechSettings> speechSettings, IOptions<BlobStorageSettings> blobSettings, ITranslationService translationService, IHttpClientFactory httpClientFactory, ILogger<NarrationAudioService> logger)
         {
             _context = context;
             _speechSettings = speechSettings.Value;
             _blobSettings = blobSettings.Value;
             _translationService = translationService;
+            _httpClientFactory = httpClientFactory;
             _logger = logger;
         }
 
@@ -113,26 +113,9 @@ namespace Api.Application.Services
 
                 // Nếu ngôn ngữ đích trùng với ngôn ngữ gốc thì dùng nguyên văn bản.
                 // Nếu khác nhau thì dịch sang ngôn ngữ đích trước khi đọc bằng TTS.
-                string textToSpeak;
-                if (string.Equals(languageCode, targetLanguageCode, StringComparison.OrdinalIgnoreCase))
-                {
-                    textToSpeak = scriptText;
-                }
-                else
-                {
-                    try
-                    {
-                        textToSpeak = await _translationService.TranslateAsync(scriptText, languageCode, targetLanguageCode);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(
-                            ex,
-                            "Bỏ qua voice profile {VoiceProfileId} vì dịch từ {FromCode} sang {ToCode} thất bại: {Error}",
-                            profile.Id, languageCode, targetLanguageCode, ex.Message);
-                        continue;
-                    }
-                }
+                var textToSpeak = string.Equals(languageCode, targetLanguageCode, StringComparison.OrdinalIgnoreCase)
+                    ? scriptText
+                    : await _translationService.TranslateAsync(scriptText, languageCode, targetLanguageCode);
 
                 _logger.LogInformation(
                     "Đang xử lý voice profile {VoiceProfileId} với ngôn ngữ đích {TargetLanguageCode} cho NarrationContentId: {NarrationContentId}",
@@ -146,15 +129,15 @@ namespace Api.Application.Services
 
                 // Tạo hoặc cập nhật một bản ghi audio cho profile hiện tại.
                 // profile.Id và profile.Provider được lưu kèm để truy vết nguồn cấu hình TTS đã dùng.
-                // Lỗi TTS synthesis KHÔNG được bắt ở đây — để propagate lên background service.
                 var audio = await CreateOrUpdateSingleAsync(narrationContentId, textToSpeak, targetLanguageCode, profileVoice, provider, profile.Id, profile.Provider);
-
-                // Lưu ngay sau khi tạo thành công để không mất audio nếu profile tiếp theo lỗi.
-                await _context.SaveChangesAsync();
                 results.Add(audio);
 
                 _logger.LogInformation("Hoàn tất voice profile {VoiceProfileId} cho NarrationContentId: {NarrationContentId}", profile.Id, narrationContentId);
             }
+
+            // Bước 8: Lưu toàn bộ thay đổi vào database sau khi xử lý xong tất cả profile.
+            // Việc SaveChangesAsync chỉ gọi một lần giúp giảm số lần round-trip tới DB.
+            await _context.SaveChangesAsync();
 
             _logger.LogInformation("Đã lưu {Count} audio TTS cho NarrationContentId: {NarrationContentId}", results.Count, narrationContentId);
 
@@ -236,94 +219,59 @@ namespace Api.Application.Services
         /// </returns>
         private async Task<(string audioUrl, string blobId, int? durationSeconds, string voiceName)> SynthesizeAndUploadAsync(Guid narrationContentId, string scriptText, string languageCode, string? voice)
         {
-            // Kiểm tra cấu hình Azure Speech trước khi gọi dịch vụ bên ngoài.
-            if (string.IsNullOrWhiteSpace(_speechSettings.Key))
-            {
-                throw new InvalidOperationException("Thiếu cấu hình Azure Speech Key.");
-            }
-            if (string.IsNullOrWhiteSpace(_speechSettings.Region) && string.IsNullOrWhiteSpace(_speechSettings.Endpoint))
-            {
-                throw new InvalidOperationException("Thiếu cấu hình Azure Speech: cần Region hoặc Endpoint.");
-            }
+            if (string.IsNullOrWhiteSpace(_speechSettings.Endpoint) || string.IsNullOrWhiteSpace(_speechSettings.Key))
+                throw new InvalidOperationException("Thiếu cấu hình Azure Speech (Endpoint/Key).");
 
-            // Kiểm tra cấu hình Blob Storage trước khi upload file audio.
-            // Blob Storage là nơi lưu file nhị phân audio thay vì lưu trực tiếp trong database.
             if (string.IsNullOrWhiteSpace(_blobSettings.ConnectionString) || string.IsNullOrWhiteSpace(_blobSettings.ContainerName))
-            {
                 throw new InvalidOperationException("Thiếu cấu hình Blob Storage (ConnectionString/ContainerName).");
-            }
 
-            // Ưu tiên voice được truyền vào từ caller.
-            // Nếu caller không truyền, dùng voice mặc định để đảm bảo vẫn tạo được audio.
             var voiceName = !string.IsNullOrWhiteSpace(voice) ? voice : _speechSettings.DefaultVoice;
             if (string.IsNullOrWhiteSpace(voiceName))
-            {
                 throw new InvalidOperationException("Thiếu cấu hình DefaultVoice cho Azure Speech.");
-            }
 
-            // Tạo cấu hình cho Azure Speech SDK.
-            // Ưu tiên FromSubscription(key, region) vì đây là cách chuẩn của SDK.
-            // Fallback sang FromEndpoint khi chỉ có endpoint (custom deployment).
-            SpeechConfig speechConfig;
-            if (!string.IsNullOrWhiteSpace(_speechSettings.Region))
+            // Derive TTS REST endpoint từ cognitive services endpoint.
+            // Ví dụ: https://eastasia.api.cognitive.microsoft.com/ → https://eastasia.tts.speech.microsoft.com/cognitiveservices/v1
+            var cogUri = new Uri(_speechSettings.Endpoint);
+            var region = cogUri.Host.Split('.')[0];
+            var ttsEndpoint = $"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1";
+
+            var ssml = $"<speak version='1.0' xml:lang='{languageCode}'>" +
+                       $"<voice xml:lang='{languageCode}' name='{voiceName}'>" +
+                       SecurityElement.Escape(scriptText) +
+                       "</voice></speak>";
+
+            _logger.LogInformation("Bắt đầu synthesize TTS (REST) cho NarrationContentId: {NarrationContentId}, Endpoint: {Endpoint}", narrationContentId, ttsEndpoint);
+
+            using var httpClient = _httpClientFactory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Post, ttsEndpoint);
+            request.Headers.Add("Ocp-Apim-Subscription-Key", _speechSettings.Key);
+            request.Headers.Add("X-Microsoft-OutputFormat", "audio-16khz-32kbitrate-mono-mp3");
+            request.Headers.Add("User-Agent", "LocateAndMultilingualNarration");
+            request.Content = new StringContent(ssml, Encoding.UTF8, "application/ssml+xml");
+
+            var response = await httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
             {
-                speechConfig = SpeechConfig.FromSubscription(_speechSettings.Key, _speechSettings.Region);
-            }
-            else
-            {
-                if (!Uri.TryCreate(_speechSettings.Endpoint, UriKind.Absolute, out var endpointUri))
-                    throw new InvalidOperationException($"Azure Speech Endpoint không hợp lệ: '{_speechSettings.Endpoint}'.");
-                speechConfig = SpeechConfig.FromEndpoint(endpointUri, _speechSettings.Key);
-            }
-            speechConfig.SpeechSynthesisVoiceName = voiceName;
-            speechConfig.SpeechSynthesisLanguage = languageCode;
-
-            // Chọn format đầu ra là MP3 mono 16Khz để file nhẹ và phù hợp cho phát lại trên web/mobile.
-            speechConfig.SetSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3);
-
-            _logger.LogInformation("Bắt đầu synthesize TTS cho NarrationContentId: {NarrationContentId}", narrationContentId);
-
-            // Gọi Azure Speech để sinh audio từ script text.
-            // Nếu dịch vụ trả về không thành công thì sẽ ném lỗi để tầng trên xử lý nghiệp vụ.
-            using var synthesizer = new SpeechSynthesizer(speechConfig);
-            var result = await synthesizer.SpeakTextAsync(scriptText);
-
-            // Nếu synthesize thất bại hoặc bị hủy, lấy chi tiết lỗi từ Azure để dễ debug.
-            if (result.Reason != ResultReason.SynthesizingAudioCompleted)
-            {
-                var details = SpeechSynthesisCancellationDetails.FromResult(result);
-                throw new InvalidOperationException($"TTS thất bại: {details.ErrorDetails}");
+                var errorBody = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException($"TTS REST API thất bại: {(int)response.StatusCode} {response.StatusCode} - {errorBody}");
             }
 
-            // Upload file mp3 đã synthesize lên Blob Storage.
-            // Mỗi narrationContentId sẽ có một nhánh blob riêng để dễ quản lý và ghi đè logic sau này.
+            var audioBytes = await response.Content.ReadAsByteArrayAsync();
+
             var blobServiceClient = new BlobServiceClient(_blobSettings.ConnectionString);
             var containerClient = blobServiceClient.GetBlobContainerClient(_blobSettings.ContainerName);
             await containerClient.CreateIfNotExistsAsync(PublicAccessType.Blob);
 
-            // Tên blob dùng timestamp để tránh trùng file khi tạo nhiều lần liên tiếp.
             var blobName = $"narration-audio/{narrationContentId}/{DateTime.UtcNow:yyyyMMddHHmmssfff}.mp3";
             var blobClient = containerClient.GetBlobClient(blobName);
 
-            // Upload audio bytes với content-type chuẩn cho file mp3.
-            await using (var stream = new MemoryStream(result.AudioData))
+            await using (var stream = new MemoryStream(audioBytes))
             {
-                await blobClient.UploadAsync(stream, new BlobHttpHeaders
-                {
-                    ContentType = "audio/mpeg"
-                });
+                await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = "audio/mpeg" });
             }
 
-            // Lấy duration nếu Azure trả về.
-            // Thông tin này hữu ích để hiển thị thời lượng audio trong UI hoặc để kiểm tra nghiệp vụ.
-            var durationSeconds = result.AudioDuration > TimeSpan.Zero
-                ? (int?)Math.Round(result.AudioDuration.TotalSeconds)
-                : null;
-
             _logger.LogInformation("Upload audio thành công - BlobName: {BlobName}", blobName);
-
-            // Trả về URL public của blob + blobName (BlobId) + duration + voice thực tế đã dùng.
-            return (blobClient.Uri.ToString(), blobName, durationSeconds, voiceName);
+            return (blobClient.Uri.ToString(), blobName, null, voiceName);
         }
     }
 }
