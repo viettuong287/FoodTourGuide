@@ -17,6 +17,7 @@ namespace Web.Controllers
         private readonly SubscriptionOrderApiClient _subscriptionOrderApiClient;
         private readonly UserApiClient _userApiClient;
         private readonly QrCodeApiClient _qrCodeApiClient;
+        private readonly GeoApiClient _geoApiClient;
 
         public AdminController(
             BusinessApiClient businessApiClient,
@@ -26,7 +27,8 @@ namespace Web.Controllers
             SubscriptionApiClient subscriptionApiClient,
             SubscriptionOrderApiClient subscriptionOrderApiClient,
             UserApiClient userApiClient,
-            QrCodeApiClient qrCodeApiClient)
+            QrCodeApiClient qrCodeApiClient,
+            GeoApiClient geoApiClient)
         {
             _businessApiClient = businessApiClient;
             _stallApiClient = stallApiClient;
@@ -36,6 +38,7 @@ namespace Web.Controllers
             _subscriptionOrderApiClient = subscriptionOrderApiClient;
             _userApiClient = userApiClient;
             _qrCodeApiClient = qrCodeApiClient;
+            _geoApiClient = geoApiClient;
         }
 
         public async Task<IActionResult> Dashboard(CancellationToken cancellationToken)
@@ -358,6 +361,43 @@ namespace Web.Controllers
 
             TempData["SuccessMessage"] = $"Đã cập nhật gói {model.Plan} cho \"{model.BusinessName}\" thành công.";
             return RedirectToAction(nameof(Subscription), new { page, pageSize, search });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ActiveDevices(int withinSeconds = 30, CancellationToken cancellationToken = default)
+        {
+            withinSeconds = Math.Clamp(withinSeconds, 10, 300);
+            var result = await _geoApiClient.GetActiveDevicesAsync(withinSeconds, cancellationToken);
+            ViewBag.WithinSeconds = withinSeconds;
+            return View(result?.Data ?? new Shared.DTOs.Geo.ActiveDevicesSummaryDto
+            {
+                ActiveCount = 0,
+                WithinSeconds = withinSeconds,
+                AsOf = DateTimeOffset.UtcNow,
+                Devices = []
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ActiveDevicesData(int withinSeconds = 30, CancellationToken cancellationToken = default)
+        {
+            withinSeconds = Math.Clamp(withinSeconds, 10, 300);
+            var result = await _geoApiClient.GetActiveDevicesAsync(withinSeconds, cancellationToken);
+            return Json(result);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetDevice(string deviceId, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(deviceId))
+                return Json(new { success = false, message = "DeviceId không hợp lệ." });
+
+            var result = await _geoApiClient.ResetDeviceAsync(deviceId, cancellationToken);
+            if (result?.Success == true)
+                return Json(new { success = true });
+
+            return Json(new { success = false, message = result?.Error?.Message ?? "Reset thất bại." });
         }
     }
 }

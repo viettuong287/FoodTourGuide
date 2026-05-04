@@ -1,0 +1,478 @@
+@model Shared.DTOs.Geo.ActiveDevicesSummaryDto
+@{
+    ViewData["Title"] = "Thiết bị đang hoạt động";
+    var withinSeconds = (int)(ViewBag.WithinSeconds ?? 30);
+    var androidCount = Model.Devices.Count(d => string.Equals(d.Platform, "Android", StringComparison.OrdinalIgnoreCase));
+    var otherCount = Model.ActiveCount - androidCount;
+}
+
+@section Styles {
+<style>
+    :root {
+        --cream: #f7f3ed; --cream-dark: #ede8df; --ivory: #faf8f4;
+        --navy: #1e2d40; --navy-mid: #2c3e55; --navy-light: #3d5068;
+        --gold: #b8964e; --gold-light: #d4ae6a; --gold-pale: #f0e4c8;
+        --text-dark: #1e2d40; --text-mid: #4a5568; --text-light: #718096;
+        --border: #d9cfc2;
+        --shadow-sm: 0 1px 4px rgba(30,45,64,0.07);
+        --shadow-md: 0 4px 16px rgba(30,45,64,0.10);
+        --shadow-lg: 0 8px 32px rgba(30,45,64,0.13);
+        --radius: 10px; --radius-sm: 6px;
+    }
+
+    .breadcrumb { background: transparent; padding: 0 0 12px; margin-bottom: 20px; font-size: 13px; }
+    .breadcrumb-item a { color: var(--text-mid); text-decoration: none; transition: color 0.15s; }
+    .breadcrumb-item a:hover { color: var(--gold); }
+    .breadcrumb-item.active { color: var(--text-light); }
+    .breadcrumb-item + .breadcrumb-item::before { color: var(--border); }
+
+    /* Page header */
+    .page-header {
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+        border-radius: var(--radius); padding: 28px 40px; margin-bottom: 20px;
+        display: flex; justify-content: space-between; align-items: center;
+        flex-wrap: wrap; gap: 16px; box-shadow: var(--shadow-md);
+        position: relative; overflow: hidden;
+    }
+    .page-header::before { content: ''; position: absolute; top: -20px; right: -20px; width: 160px; height: 160px; border-radius: 50%; background: rgba(184,150,78,0.08); pointer-events: none; }
+    .page-header-content { position: relative; z-index: 1; }
+    .page-header h1 { font-size: 1.9rem; font-weight: 700; color: var(--cream); margin: 0 0 6px; display: flex; align-items: center; gap: 12px; }
+    .page-header h1 i { color: var(--gold-light); }
+    .page-header .lead { font-size: 13.5px; color: rgba(247,243,237,0.7); margin: 0; }
+    .page-header-actions { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; }
+
+    /* LIVE badge */
+    .live-badge {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: rgba(58,125,79,0.25); border: 1px solid rgba(58,125,79,0.5);
+        color: #6fcf97; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+        padding: 5px 14px; border-radius: 20px;
+    }
+    .pulse-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: #6fcf97;
+        animation: pulse 1.4s infinite;
+    }
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50%       { opacity: .35; transform: scale(.6); }
+    }
+    .refresh-label { font-size: 12.5px; color: rgba(247,243,237,0.55); }
+    .refresh-label span { color: var(--gold-light); font-weight: 600; }
+
+    /* Controls row */
+    .controls-row {
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: 10px; margin-bottom: 10px;
+    }
+    .control-label { font-size: 12.5px; color: var(--text-light); font-weight: 600; white-space: nowrap; }
+    .window-select {
+        font-size: 12.5px; padding: 5px 10px; border: 1px solid var(--border);
+        border-radius: var(--radius-sm); background: #fff; color: var(--text-dark); cursor: pointer;
+    }
+    .update-label { font-size: 12px; color: var(--text-light); }
+    .update-label span { color: var(--text-mid); font-weight: 600; }
+
+    /* Progress bar */
+    .progress-wrap { height: 3px; background: var(--cream-dark); border-radius: 2px; margin-bottom: 22px; overflow: hidden; }
+    .progress-fill {
+        height: 100%; width: 0%;
+        background: linear-gradient(90deg, var(--gold), var(--gold-light));
+        border-radius: 2px;
+    }
+
+    /* Stat cards */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
+    .stat-card { background: var(--ivory); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; box-shadow: var(--shadow-sm); display: flex; align-items: center; gap: 16px; transition: box-shadow 0.2s; }
+    .stat-card:hover { box-shadow: var(--shadow-md); }
+    .stat-card.stat-online { border-color: rgba(58,125,79,0.35); }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .stat-icon i { font-size: 22px; }
+    .stat-icon.online  { background: rgba(58,125,79,0.10); }  .stat-icon.online i  { color: #3a7d4f; }
+    .stat-icon.android { background: rgba(61,176,91,0.10);  }  .stat-icon.android i { color: #3db05b; }
+    .stat-icon.other   { background: rgba(30,45,64,0.08);   }  .stat-icon.other i   { color: var(--navy-light); }
+    .stat-number { font-size: 2rem; font-weight: 700; color: var(--text-dark); line-height: 1; }
+    .stat-label  { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-light); margin-top: 3px; }
+    .stat-sub    { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+
+    /* Table card */
+    .table-card { background: var(--ivory); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .table-card-header { background: var(--cream-dark); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; border-radius: var(--radius) var(--radius) 0 0; font-size: 14px; font-weight: 600; color: var(--text-dark); }
+    .table { margin: 0; font-size: 13.5px; }
+    .table thead { background: var(--cream-dark); }
+    .table thead th { font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-mid); border-bottom: 2px solid var(--border); padding: 11px 16px; white-space: nowrap; }
+    .table tbody td { padding: 12px 16px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+    .table tbody tr { background: #fff; transition: background 0.15s; }
+    .table tbody tr:hover { background: var(--cream); }
+    .table tbody tr:last-child td { border-bottom: none; }
+
+    /* Platform cell */
+    .platform-cell { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+    .platform-cell .bi-android2 { color: #3db05b; }
+    .platform-cell .bi-apple    { color: var(--navy-light); }
+    .platform-cell .bi-phone    { color: var(--text-light); }
+
+    /* Device info */
+    .device-model { font-size: 13px; color: var(--text-dark); }
+    .device-mfr   { font-size: 12px; color: var(--text-light); margin-left: 4px; }
+    .device-id    { font-family: monospace; font-size: 12px; background: var(--cream-dark); padding: 2px 8px; border-radius: 4px; color: var(--navy-light); letter-spacing: 0.04em; }
+
+    /* Time */
+    .time-cell { font-size: 12.5px; color: var(--text-mid); }
+
+    /* "Cách đây" badges */
+    .badge-recent { background: rgba(58,125,79,0.10);  color: #3a7d4f; border: 1px solid rgba(58,125,79,0.25);  padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .badge-ago    { background: rgba(184,150,78,0.10); color: #7a5c1e; border: 1px solid rgba(184,150,78,0.28); padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+    /* Reset button */
+    .btn-reset {
+        padding: 5px 10px; font-size: 13px; border-radius: var(--radius-sm);
+        border: 1px solid rgba(162,73,58,0.3); background: rgba(162,73,58,0.07);
+        color: #a2493a; cursor: pointer; transition: all 0.18s;
+    }
+    .btn-reset:hover { background: rgba(162,73,58,0.15); border-color: rgba(162,73,58,0.5); transform: translateY(-1px); }
+    .btn-reset:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 56px 20px; color: var(--text-light); }
+    .empty-state i { font-size: 44px; margin-bottom: 12px; display: block; opacity: 0.4; }
+    .empty-state p { font-size: 13.5px; margin: 0; }
+
+    @@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .anim-1 { animation: fadeUp 0.4s ease 0.05s both; }
+    .anim-2 { animation: fadeUp 0.4s ease 0.10s both; }
+    .anim-3 { animation: fadeUp 0.4s ease 0.15s both; }
+    .anim-4 { animation: fadeUp 0.4s ease 0.20s both; }
+
+    @@media (max-width: 768px) {
+        .stats-row { grid-template-columns: 1fr; }
+        .page-header { padding: 22px 20px; }
+        .page-header h1 { font-size: 1.5rem; }
+    }
+</style>
+}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+        <li class="breadcrumb-item"><a asp-controller="Admin" asp-action="Dashboard">Admin</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Thiết bị online</li>
+    </ol>
+</nav>
+
+<!-- Page Header -->
+<div class="page-header anim-1">
+    <div class="page-header-content">
+        <h1><i class="bi bi-broadcast"></i>Thiết bị đang hoạt động</h1>
+        <p class="lead">Theo dõi thời gian thực các thiết bị đang kết nối với hệ thống.</p>
+    </div>
+    <div class="page-header-actions">
+        <span class="live-badge" id="live-badge">
+            <span class="pulse-dot"></span>LIVE
+        </span>
+        <span class="refresh-label">Làm mới sau <span id="countdown">5</span>s</span>
+    </div>
+</div>
+
+<!-- Controls row -->
+<div class="controls-row anim-2">
+    <div class="d-flex align-items-center gap-2">
+        <span class="control-label">Cửa sổ hoạt động:</span>
+        <select class="window-select" id="withinSeconds-select">
+            @foreach (var (val, lbl) in new[] { (30,"30 giây"), (60,"1 phút"), (120,"2 phút"), (180,"3 phút"), (300,"5 phút") })
+            {
+                if (withinSeconds == val)
+                {
+                    <option value="@val" selected>@lbl qua</option>
+                }
+                else
+                {
+                    <option value="@val">@lbl qua</option>
+                }
+            }
+        </select>
+    </div>
+    <span class="update-label">Cập nhật lúc: <span id="last-updated">@Model.AsOf.ToLocalTime().ToString("HH:mm:ss")</span></span>
+</div>
+
+<!-- Progress bar -->
+<div class="progress-wrap anim-2">
+    <div class="progress-fill" id="refresh-bar"></div>
+</div>
+
+@Html.AntiForgeryToken()
+
+<!-- Stat cards -->
+<div class="stats-row anim-3">
+    <div class="stat-card stat-online">
+        <div class="stat-icon online"><i class="bi bi-wifi"></i></div>
+        <div>
+            <div class="stat-number" id="active-count">@Model.ActiveCount</div>
+            <div class="stat-label">Đang online</div>
+            <div class="stat-sub" id="window-label">
+                trong @(withinSeconds < 60 ? $"{withinSeconds} giây" : $"{withinSeconds / 60} phút") qua
+            </div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon android"><i class="bi bi-android2"></i></div>
+        <div>
+            <div class="stat-number" id="android-count">@androidCount</div>
+            <div class="stat-label">Android</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon other"><i class="bi bi-apple"></i></div>
+        <div>
+            <div class="stat-number" id="other-count">@otherCount</div>
+            <div class="stat-label">iOS / Khác</div>
+        </div>
+    </div>
+</div>
+
+<!-- Device table -->
+<div class="table-card anim-4">
+    <div class="table-card-header">
+        <i class="bi bi-list-ul me-2"></i>Danh sách thiết bị
+    </div>
+    <div class="table-responsive">
+        <table class="table" aria-label="Danh sách thiết bị online">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Nền tảng</th>
+                    <th>Thiết bị</th>
+                    <th>Device ID</th>
+                    <th>Hoạt động lúc</th>
+                    <th>Cách đây</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="device-table-body">
+                @if (!Model.Devices.Any())
+                {
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state">
+                                <i class="bi bi-broadcast-pin"></i>
+                                <p>Không có thiết bị nào hoạt động trong cửa sổ này.</p>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    var idx = 1;
+                    foreach (var d in Model.Devices)
+                    {
+                        var isAndroid = string.Equals(d.Platform, "Android", StringComparison.OrdinalIgnoreCase);
+                        var isIos     = string.Equals(d.Platform, "iOS", StringComparison.OrdinalIgnoreCase);
+                        var iconCls   = isAndroid ? "bi-android2" : isIos ? "bi-apple" : "bi-phone";
+                        var secsAgo   = (int)(DateTimeOffset.UtcNow - d.LastSeenAt).TotalSeconds;
+                        <tr>
+                            <td class="text-muted" style="font-size:12.5px;">@(idx++)</td>
+                            <td>
+                                <span class="platform-cell">
+                                    <i class="bi @iconCls"></i>
+                                    @(d.Platform ?? "—")
+                                </span>
+                            </td>
+                            <td>
+                                <span class="device-model">@(d.DeviceModel ?? "—")</span>
+                                @if (!string.IsNullOrWhiteSpace(d.Manufacturer))
+                                {
+                                    <span class="device-mfr">(@d.Manufacturer)</span>
+                                }
+                            </td>
+                            <td>
+                                <code class="device-id">
+                                    @(d.DeviceId.Length > 16 ? d.DeviceId[..16] + "…" : d.DeviceId)
+                                </code>
+                            </td>
+                            <td class="time-cell">@d.LastSeenAt.ToLocalTime().ToString("HH:mm:ss")</td>
+                            <td>
+                                @if (secsAgo < 60)
+                                {
+                                    <span class="badge-recent">@secsAgo giây trước</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-ago">@(secsAgo / 60) phút trước</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn-reset btn-reset-device"
+                                        data-device-id="@d.DeviceId"
+                                        title="Reset thiết bị về trạng thái mới">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const REFRESH_INTERVAL = 5;
+    let withinSeconds = @withinSeconds;
+    let countdown = REFRESH_INTERVAL;
+    let countdownTimer = null;
+    const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value ?? '';
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function secsAgoLabel(isoStr) {
+        const diff = Math.round((Date.now() - new Date(isoStr).getTime()) / 1000);
+        if (diff < 60) return `<span class="badge-recent">${diff} giây trước</span>`;
+        return `<span class="badge-ago">${Math.floor(diff / 60)} phút trước</span>`;
+    }
+
+    function platformIcon(platform) {
+        if (!platform) return '<i class="bi bi-phone"></i>';
+        const p = platform.toLowerCase();
+        if (p === 'android') return '<i class="bi bi-android2"></i>';
+        if (p === 'ios')     return '<i class="bi bi-apple"></i>';
+        return '<i class="bi bi-phone"></i>';
+    }
+
+    function toLocalTime(isoStr) {
+        return new Date(isoStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function shortId(id) {
+        return id && id.length > 16 ? id.substring(0, 16) + '…' : (id ?? '—');
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+
+    function renderTable(devices) {
+        const tbody = document.getElementById('device-table-body');
+        if (!devices || devices.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7">
+                <div class="empty-state">
+                    <i class="bi bi-broadcast-pin"></i>
+                    <p>Không có thiết bị nào hoạt động trong cửa sổ này.</p>
+                </div></td></tr>`;
+            return;
+        }
+        tbody.innerHTML = devices.map((d, i) => `
+            <tr>
+                <td class="text-muted" style="font-size:12.5px;">${i + 1}</td>
+                <td><span class="platform-cell">${platformIcon(d.platform)} ${d.platform ?? '—'}</span></td>
+                <td>
+                    <span class="device-model">${d.deviceModel ?? '—'}</span>
+                    ${d.manufacturer ? `<span class="device-mfr">(${d.manufacturer})</span>` : ''}
+                </td>
+                <td><code class="device-id">${shortId(d.deviceId)}</code></td>
+                <td class="time-cell">${toLocalTime(d.lastSeenAt)}</td>
+                <td>${secsAgoLabel(d.lastSeenAt)}</td>
+                <td>
+                    <button class="btn-reset btn-reset-device"
+                            data-device-id="${d.deviceId}"
+                            title="Reset thiết bị">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </td>
+            </tr>`).join('');
+    }
+
+    // ── Fetch & update ────────────────────────────────────────────────────────
+
+    async function refresh() {
+        try {
+            const res = await fetch(`/Admin/ActiveDevicesData?withinSeconds=${withinSeconds}`);
+            if (!res.ok) return;
+            const json = await res.json();
+            if (!json?.success || !json.data) return;
+            const data = json.data;
+
+            document.getElementById('active-count').textContent = data.activeCount;
+            document.getElementById('last-updated').textContent = toLocalTime(data.asOf);
+            document.getElementById('window-label').textContent =
+                `trong ${data.withinSeconds < 60 ? data.withinSeconds + ' giây' : data.withinSeconds / 60 + ' phút'} qua`;
+
+            const android = (data.devices ?? []).filter(d => d.platform?.toLowerCase() === 'android').length;
+            document.getElementById('android-count').textContent = android;
+            document.getElementById('other-count').textContent   = data.activeCount - android;
+
+            renderTable(data.devices);
+        } catch { /* network error – thử lại lần sau */ }
+    }
+
+    // ── Countdown & progress bar ──────────────────────────────────────────────
+
+    function startCountdown() {
+        clearInterval(countdownTimer);
+        countdown = REFRESH_INTERVAL;
+        document.getElementById('countdown').textContent = countdown;
+
+        const bar = document.getElementById('refresh-bar');
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+        setTimeout(() => {
+            bar.style.transition = `width ${REFRESH_INTERVAL}s linear`;
+            bar.style.width = '100%';
+        }, 50);
+
+        countdownTimer = setInterval(() => {
+            countdown--;
+            document.getElementById('countdown').textContent = Math.max(0, countdown);
+            if (countdown <= 0) {
+                clearInterval(countdownTimer);
+                refresh().then(() => startCountdown());
+            }
+        }, 1000);
+    }
+
+    // ── Window selector ───────────────────────────────────────────────────────
+
+    document.getElementById('withinSeconds-select').addEventListener('change', function () {
+        withinSeconds = parseInt(this.value);
+        refresh().then(() => startCountdown());
+    });
+
+    // ── Reset device ──────────────────────────────────────────────────────────
+
+    document.getElementById('device-table-body').addEventListener('click', async function (e) {
+        const btn = e.target.closest('.btn-reset-device');
+        if (!btn) return;
+
+        const deviceId = btn.dataset.deviceId;
+        if (!confirm(`Reset thiết bị ${shortId(deviceId)}?\nThiết bị sẽ tải lại dữ liệu trong lần ping tiếp theo.`)) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:14px;height:14px;"></span>';
+
+        try {
+            const form = new FormData();
+            form.append('deviceId', deviceId);
+            form.append('__RequestVerificationToken', antiForgeryToken);
+
+            const res  = await fetch('/Admin/ResetDevice', { method: 'POST', body: form });
+            const json = await res.json();
+
+            if (json.success) {
+                btn.innerHTML = '<i class="bi bi-check-lg" style="color:#3a7d4f;"></i>';
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+                }, 2000);
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+                alert('Reset thất bại: ' + (json.message ?? 'Lỗi không xác định.'));
+            }
+        } catch {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+        }
+    });
+
+    // ── Start ─────────────────────────────────────────────────────────────────
+    startCountdown();
+</script>
+}
