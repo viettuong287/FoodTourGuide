@@ -1,4 +1,4 @@
-﻿namespace VinhThucAudioGuide
+namespace VinhThucAudioGuide
 {
     public partial class AppShell : Shell
     {

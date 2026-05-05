@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace VinhThucAudioGuide;
@@ -23,17 +23,17 @@ public class LocalizationManager : INotifyPropertyChanged
     // --- KỊCH BẢN THUYẾT MINH 5 THỨ TIẾNG ---
     public string AudioScript => CurrentLanguage switch
     {
-        "English" => "Welcome to Vinh Thuc. Experience the island's beauty and local stories.",
-        "Français" => "Bienvenue à Vinh Thuc. Découvrez la beauté de l'île et ses récits locaux.",
-        "中文" => "欢迎来到永实。体验岛屿的美丽和本地故事。",
-        "한국어" => "Vinh Thuc에 오신 것을 환영합니다. 섬의 아름다움과 지역 이야기를 체험하세요.",
-        _ => "Chào mừng bạn đến với đảo Vĩnh Thực. Hãy trải nghiệm vẻ đẹp hoang sơ và ngọn hải đăng cổ kính."
+        "English" => "Welcome to Ho Chi Minh City. Explore the vibrant culture, historic landmarks, and iconic streets of this dynamic metropolis.",
+        "Français" => "Bienvenue à Hô-Chi-Minh-Ville. Explorez la culture vibrante, les sites historiques et les rues emblématiques de cette métropole dynamique.",
+        "中文" => "欢迎来到胡志明市。探索这座充满活力的大都市的文化、历史地标和标志性街道。",
+        "한국어" => "호치민 시에 오신 것을 환영합니다. 이 활기찬 도시의 문화, 역사적 명소, 상징적인 거리를 탐험하세요.",
+        _ => "Chào mừng đến với Thành phố Hồ Chí Minh. Hãy khám phá văn hóa sôi động, di tích lịch sử và những con phố nổi tiếng của thành phố năng động này."
     };
 
     // --- HOME ---
-    public string AppTitle => CurrentLanguage switch { "English" => "Vinh Thuc Guide", "Français" => "Guide Vinh Thuc", "中文" => "永实岛导览", "한국어" => "빈득 안내", _ => "Vĩnh Thực Audio Guide" };
-    public string WelcomeText => CurrentLanguage switch { "English" => "Discover island beauty through automated stories.", "Français" => "Découvrez l'île à travers des récits automatiques.", "中文" => "通过自动讲解探索岛屿之美。", "한국어" => "자동 내레이션으로 섬의 아름다움을 발견하세요.", _ => "Khám phá vẻ đẹp biển đảo qua từng câu chuyện kể tự động." };
-    public string StartButton => CurrentLanguage switch { "English" => "START JOURNEY", "Français" => "COMMENCER", "中文" => "开始旅程", "한국어" => "여행 시작", _ => "BẮT ĐẦU HÀNH TRÌNH" };
+    public string AppTitle => CurrentLanguage switch { "English" => "Ho Chi Minh City Guide", "Français" => "Guide Hô-Chi-Minh", "中文" => "胡志明市导览", "한국어" => "호치민 시 가이드", _ => "Audio Guide Thành phố Hồ Chí Minh" };
+    public string WelcomeText => CurrentLanguage switch { "English" => "Explore the vibrant streets, rich history and iconic landmarks of Ho Chi Minh City.", "Français" => "Découvrez les rues animées, l'histoire riche et les sites emblématiques de Hô-Chi-Minh-Ville.", "中文" => "探索胡志明市充满活力的街道、丰富的历史和标志性景点。", "한국어" => "호치민 시의 활기찬 거리, 풍부한 역사, 상징적인 명소를 탐험하세요.", _ => "Khám phá những con phố sôi động, lịch sử phong phú và các địa danh nổi tiếng của Thành phố Hồ Chí Minh." };
+    public string StartButton => CurrentLanguage switch { "English" => "EXPLORE THE CITY", "Français" => "EXPLORER LA VILLE", "中文" => "探索城市", "한국어" => "도시 탐험하기", _ => "KHÁM PHÁ THÀNH PHỐ" };
 
     // --- SETTINGS ---
     public string SettingsTitle => CurrentLanguage switch { "English" => "SETTINGS", "Français" => "PARAMÈTRES", "中文" => "设置", "한국어" => "설정", _ => "CÀI ĐẶT" };

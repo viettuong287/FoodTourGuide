@@ -7,9 +7,9 @@
     <Grid>
         <ScrollView>
             <VerticalStackLayout Padding="20" Spacing="25">
-                <Label x:Name="LblHeader" FontSize="28" FontAttributes="Bold" TextColor="#0055CC" Margin="0,10,0,0"/>
+                <Label x:Name="LblHeader" FontSize="30" FontAttributes="Bold" TextColor="#0d47a1" Margin="0,10,0,0"/>
 
-                <Label x:Name="GroupLang" FontSize="13" FontAttributes="Bold" TextColor="Gray" Margin="5,0,0,-15"/>
+                <Label x:Name="GroupLang" FontSize="15" FontAttributes="Bold" TextColor="#1565c0" TextTransform="Uppercase" Margin="5,0,0,-10"/>
                 <Frame CornerRadius="15" Padding="0" HasShadow="False" BorderColor="LightGray" BackgroundColor="White">
                     <Grid Padding="20,15" ColumnDefinitions="*, Auto">
                         <Grid.GestureRecognizers>
@@ -23,7 +23,7 @@
                     </Grid>
                 </Frame>
 
-                <Label x:Name="GroupAudio" FontSize="13" FontAttributes="Bold" TextColor="Gray" Margin="5,10,0,-15"/>
+                <Label x:Name="GroupAudio" FontSize="15" FontAttributes="Bold" TextColor="#1565c0" TextTransform="Uppercase" Margin="5,15,0,-10"/>
                 <Frame CornerRadius="15" Padding="0" HasShadow="False" BorderColor="LightGray" BackgroundColor="White">
                     <VerticalStackLayout>
                         <Grid Padding="20,15" ColumnDefinitions="*, Auto">

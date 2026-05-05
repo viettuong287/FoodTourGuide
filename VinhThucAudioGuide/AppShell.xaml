@@ -5,8 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:VinhThucAudioGuide"
     Shell.FlyoutBehavior="Disabled"
-    BackgroundColor="#FFFFFF"
-    BackgroundImageSource="hinhnen.png">
+    BackgroundColor="Black">
 
     <Shell.Resources>
         <ResourceDictionary>
@@ -20,18 +19,24 @@
     </Shell.Resources>
 
     <TabBar>
+        <!-- Tab 1: Trang chủ - hiện đầu tiên sau splash -->
         <Tab x:Name="TabHome" Title="Trang chủ" Icon="ic_home.svg">
-            <ShellContent Route="HomePage" ContentTemplate="{DataTemplate local:HomePage}" />
+            <ShellContent Route="HomePage"
+                          ContentTemplate="{DataTemplate local:HomePage}"
+                          Shell.BackgroundColor="Transparent" />
         </Tab>
 
+        <!-- Tab 2: Bản đồ -->
         <Tab x:Name="TabMap" Title="Bản đồ" Icon="ic_map.svg">
             <ShellContent Route="MainPage" ContentTemplate="{DataTemplate local:MainPage}" />
         </Tab>
 
+        <!-- Tab 3: Mã QR -->
         <Tab x:Name="TabQr" Title="Mã QR" Icon="ic_qr.svg">
             <ShellContent Route="QrPage" ContentTemplate="{DataTemplate local:QrPage}" />
         </Tab>
 
+        <!-- Tab 4: Cài đặt -->
         <Tab x:Name="TabSettings" Title="Cài đặt" Icon="ic_settings.svg">
             <ShellContent Route="SettingsPage" ContentTemplate="{DataTemplate local:SettingsPage}" />
         </Tab>

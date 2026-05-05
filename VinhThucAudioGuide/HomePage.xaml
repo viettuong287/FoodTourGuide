@@ -2,42 +2,74 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="VinhThucAudioGuide.HomePage"
-             BackgroundColor="Black">
+             BackgroundColor="Black"
+             NavigationPage.HasNavigationBar="False">
 
     <Grid>
-        <Image Source="trangchu.jpg" Aspect="AspectFill" />
-        <BoxView Color="Black" Opacity="0.25" />
+        <!-- Background image trangchu tràn viền - loaded from code-behind -->
+        <Image x:Name="ImgBackground"
+               Aspect="AspectFill"
+               HorizontalOptions="Fill"
+               VerticalOptions="Fill" />
 
-        <ScrollView>
-            <VerticalStackLayout Padding="25" Spacing="16" VerticalOptions="Center">
-                <Frame Padding="20" CornerRadius="18" HasShadow="False" BackgroundColor="#EEFFFFFF" BorderColor="#33FFFFFF">
-                    <VerticalStackLayout Spacing="12">
-                        <Label x:Name="LblTitle"
-                               FontSize="28"
-                               FontAttributes="Bold"
-                               HorizontalTextAlignment="Center"
-                               TextColor="#A00000"/>
-                        <Label x:Name="LblDesc"
-                               HorizontalTextAlignment="Center"
-                               FontSize="16"
-                               TextColor="#2E2E2E"
-                               LineHeight="1.3"/>
-                        <Label Text="v1.0.0"
-                               FontSize="13"
-                               HorizontalOptions="Center"
-                               TextColor="#606060" />
-                    </VerticalStackLayout>
-                </Frame>
+        <!-- Overlay tối để chữ nổi -->
+        <BoxView Color="Black" Opacity="0.45" />
 
-                <Button Grid.Row="5" x:Name="BtnStart"
-                        BackgroundColor="#0055CC"
-                        TextColor="White"
-                        FontAttributes="Bold"
-                        CornerRadius="15"
-                        HeightRequest="55"
-                        Margin="0,8,0,20"
-                        Clicked="BtnGoToMap_Clicked"/>
+        <!-- Layout nội dung -->
+        <Grid RowDefinitions="*, Auto">
+
+            <VerticalStackLayout Grid.Row="0"
+                                 VerticalOptions="Center"
+                                 Padding="32,0"
+                                 Spacing="0">
+
+                <Label Text="🏙️" FontSize="64" HorizontalOptions="Center" Margin="0,0,0,16"/>
+
+                <Label x:Name="LblTitle"
+                       FontSize="30"
+                       FontAttributes="Bold"
+                       HorizontalTextAlignment="Center"
+                       TextColor="White"
+                       LineHeight="1.2"
+                       Margin="0,0,0,14">
+                    <Label.Shadow>
+                        <Shadow Brush="Black" Offset="2,2" Opacity="0.8" Radius="4"/>
+                    </Label.Shadow>
+                </Label>
+
+                <BoxView HeightRequest="2" WidthRequest="70" Color="#FFCC00"
+                         HorizontalOptions="Center" Margin="0,0,0,16" CornerRadius="1"/>
+
+                <Label x:Name="LblDesc"
+                       HorizontalTextAlignment="Center"
+                       FontSize="15"
+                       TextColor="#EEEEEE"
+                       LineHeight="1.5"
+                       Margin="0,0,0,10">
+                    <Label.Shadow>
+                        <Shadow Brush="Black" Offset="1,1" Opacity="0.7" Radius="3"/>
+                    </Label.Shadow>
+                </Label>
+
+                <Label Text="v1.0.0" FontSize="12"
+                       HorizontalOptions="Center" TextColor="#AAAAAA" Margin="0,6,0,0"/>
             </VerticalStackLayout>
-        </ScrollView>
+
+            <VerticalStackLayout Grid.Row="1" Padding="32,0,32,52">
+                <Button x:Name="BtnStart"
+                        BackgroundColor="#FFCC00"
+                        TextColor="#111111"
+                        FontAttributes="Bold"
+                        FontSize="16"
+                        CornerRadius="32"
+                        HeightRequest="58"
+                        Clicked="BtnGoToMap_Clicked">
+                    <Button.Shadow>
+                        <Shadow Brush="Black" Offset="0,4" Opacity="0.5" Radius="8"/>
+                    </Button.Shadow>
+                </Button>
+            </VerticalStackLayout>
+
+        </Grid>
     </Grid>
 </ContentPage>

@@ -3,4 +3,6 @@
     <color name="colorPrimary">#512BD4</color>
     <color name="colorPrimaryDark">#2B0B98</color>
     <color name="colorAccent">#2B0B98</color>
+    <!-- Splash background - set to match image so no border shows -->
+    <color name="splash_background">#000000</color>
 </resources>
