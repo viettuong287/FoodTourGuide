@@ -49,12 +49,10 @@
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Remove="Resources\Images\logoapp.jpg" />
-		<!-- Loại bgtrangchu.jpg khỏi MauiImage để tránh conflict với EmbeddedResource -->
-		<MauiImage Remove="Resources\Images\bgtrangchu.jpg" />
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
 		<MauiImage Update="Resources\Images\hinhnenapp.jpg" Resize="True" BaseSize="1080,1920" />
 
-		<!-- bgtrangchu.jpg: nhúng thẳng vào DLL, bypass hoàn toàn MAUI/Android image pipeline -->
+		<!-- bgtrangchu.jpg: nhúng vào DLL để load từ code-behind nếu MauiImage fail -->
 		<EmbeddedResource Include="Resources\Images\bgtrangchu.jpg" />
 
 		<!-- Custom Fonts -->

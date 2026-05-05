@@ -2,74 +2,77 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="VinhThucAudioGuide.HomePage"
-             BackgroundColor="Black"
-             NavigationPage.HasNavigationBar="False">
+             BackgroundColor="Transparent"
+             Shell.NavBarIsVisible="False">
 
-    <Grid>
-        <!-- Background image trangchu tràn viền - loaded from code-behind -->
-        <Image x:Name="ImgBackground"
-               Aspect="AspectFill"
-               HorizontalOptions="Fill"
-               VerticalOptions="Fill" />
+    <Grid RowDefinitions="*, Auto" Padding="0">
 
-        <!-- Overlay tối để chữ nổi -->
-        <BoxView Color="Black" Opacity="0.45" />
+        <!-- Vùng nội dung giữa màn hình -->
+        <VerticalStackLayout Grid.Row="0"
+                             VerticalOptions="Center"
+                             Padding="24,0"
+                             Spacing="0">
 
-        <!-- Layout nội dung -->
-        <Grid RowDefinitions="*, Auto">
+            <!-- Card nền tối chứa text - giúp chữ nổi bật trên ảnh sáng -->
+            <Border BackgroundColor="#CC000000"
+                    StrokeThickness="0"
+                    Padding="28,32"
+                    Margin="0,0,0,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="24"/>
+                </Border.StrokeShape>
 
-            <VerticalStackLayout Grid.Row="0"
-                                 VerticalOptions="Center"
-                                 Padding="32,0"
-                                 Spacing="0">
+                <VerticalStackLayout Spacing="0">
 
-                <Label Text="🏙️" FontSize="64" HorizontalOptions="Center" Margin="0,0,0,16"/>
+                    <Label Text="🏙️"
+                           FontSize="56"
+                           HorizontalOptions="Center"
+                           Margin="0,0,0,12"/>
 
-                <Label x:Name="LblTitle"
-                       FontSize="30"
-                       FontAttributes="Bold"
-                       HorizontalTextAlignment="Center"
-                       TextColor="White"
-                       LineHeight="1.2"
-                       Margin="0,0,0,14">
-                    <Label.Shadow>
-                        <Shadow Brush="Black" Offset="2,2" Opacity="0.8" Radius="4"/>
-                    </Label.Shadow>
-                </Label>
+                    <Label x:Name="LblTitle"
+                           FontSize="28"
+                           FontAttributes="Bold"
+                           HorizontalTextAlignment="Center"
+                           TextColor="White"
+                           LineHeight="1.2"
+                           Margin="0,0,0,12"/>
 
-                <BoxView HeightRequest="2" WidthRequest="70" Color="#FFCC00"
-                         HorizontalOptions="Center" Margin="0,0,0,16" CornerRadius="1"/>
+                    <!-- Đường kẻ vàng trang trí -->
+                    <BoxView HeightRequest="2" WidthRequest="60" Color="#FFCC00"
+                             HorizontalOptions="Center" Margin="0,0,0,16" CornerRadius="1"/>
 
-                <Label x:Name="LblDesc"
-                       HorizontalTextAlignment="Center"
-                       FontSize="15"
-                       TextColor="#EEEEEE"
-                       LineHeight="1.5"
-                       Margin="0,0,0,10">
-                    <Label.Shadow>
-                        <Shadow Brush="Black" Offset="1,1" Opacity="0.7" Radius="3"/>
-                    </Label.Shadow>
-                </Label>
+                    <Label x:Name="LblDesc"
+                           HorizontalTextAlignment="Center"
+                           FontSize="14"
+                           TextColor="#E8E8E8"
+                           LineHeight="1.5"
+                           Margin="0,0,0,12"/>
 
-                <Label Text="v1.0.0" FontSize="12"
-                       HorizontalOptions="Center" TextColor="#AAAAAA" Margin="0,6,0,0"/>
-            </VerticalStackLayout>
+                    <Label Text="v1.0.0"
+                           FontSize="12"
+                           HorizontalOptions="Center"
+                           TextColor="#AAAAAA"/>
 
-            <VerticalStackLayout Grid.Row="1" Padding="32,0,32,52">
-                <Button x:Name="BtnStart"
-                        BackgroundColor="#FFCC00"
-                        TextColor="#111111"
-                        FontAttributes="Bold"
-                        FontSize="16"
-                        CornerRadius="32"
-                        HeightRequest="58"
-                        Clicked="BtnGoToMap_Clicked">
-                    <Button.Shadow>
-                        <Shadow Brush="Black" Offset="0,4" Opacity="0.5" Radius="8"/>
-                    </Button.Shadow>
-                </Button>
-            </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
 
-        </Grid>
+        </VerticalStackLayout>
+
+        <!-- Nút bắt đầu bám dưới -->
+        <VerticalStackLayout Grid.Row="1" Padding="32,0,32,52">
+            <Button x:Name="BtnStart"
+                    BackgroundColor="#FFCC00"
+                    TextColor="#111111"
+                    FontAttributes="Bold"
+                    FontSize="16"
+                    CornerRadius="32"
+                    HeightRequest="58"
+                    Clicked="BtnGoToMap_Clicked">
+                <Button.Shadow>
+                    <Shadow Brush="Black" Offset="0,4" Opacity="0.5" Radius="8"/>
+                </Button.Shadow>
+            </Button>
+        </VerticalStackLayout>
+
     </Grid>
 </ContentPage>

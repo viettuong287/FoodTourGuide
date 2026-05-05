@@ -1,7 +1,5 @@
 using Microsoft.Maui.Controls;
 using System.ComponentModel;
-using System.Reflection;
-using System.Linq;
 using System;
 
 namespace VinhThucAudioGuide
@@ -12,8 +10,46 @@ namespace VinhThucAudioGuide
         {
             InitializeComponent();
             UpdateUI();
-            // Load ảnh ngay trong constructor trước khi trang hiện
-            LoadBackgroundImage();
+        }
+
+        protected override void OnHandlerChanged()
+        {
+            base.OnHandlerChanged();
+            SetNativeBackground();
+        }
+
+        /// <summary>
+        /// Đặt background trực tiếp vào Android native view - bypass hoàn toàn MAUI Shell/ContentPage rendering.
+        /// Đây là cách chắc chắn nhất để hiển thị ảnh background khi trang nằm trong Shell.
+        /// </summary>
+        private void SetNativeBackground()
+        {
+#if ANDROID
+            try
+            {
+                if (Handler?.PlatformView is Android.Views.View androidView)
+                {
+                    var context = Android.App.Application.Context;
+
+                    // Thử load drawable "hinhnenapp" từ Android resource
+                    var resId = context.Resources!.GetIdentifier(
+                        "hinhnenapp", "drawable", context.PackageName);
+
+                    if (resId != 0)
+                    {
+                        androidView.SetBackgroundResource(resId);
+                        return;
+                    }
+
+                    // Fallback: đặt màu đen nếu không tìm thấy drawable
+                    androidView.SetBackgroundColor(Android.Graphics.Color.Black);
+                }
+            }
+            catch
+            {
+                // Ignore - không crash app nếu không set được background
+            }
+#endif
         }
 
         protected override void OnAppearing()
@@ -21,6 +57,8 @@ namespace VinhThucAudioGuide
             base.OnAppearing();
             LocalizationManager.Instance.PropertyChanged += OnLocalizationChanged;
             UpdateUI();
+            // Gọi lại để đảm bảo background được set sau khi trang hoàn toàn hiển thị
+            SetNativeBackground();
         }
 
         protected override void OnDisappearing()
@@ -29,49 +67,10 @@ namespace VinhThucAudioGuide
             LocalizationManager.Instance.PropertyChanged -= OnLocalizationChanged;
         }
 
-        /// <summary>
-        /// Load ảnh từ EmbeddedResource - nhúng thẳng trong DLL, bypass hoàn toàn mọi pipeline
-        /// </summary>
-        private void LoadBackgroundImage()
-        {
-            try
-            {
-                var assembly = typeof(HomePage).Assembly;
-                var resourceName = "VinhThucAudioGuide.Resources.Images.bgtrangchu.jpg";
-                var stream = assembly.GetManifestResourceStream(resourceName);
-
-                if (stream == null)
-                {
-                    // Tìm kiếm fallback nếu tên resource khác
-                    var all = assembly.GetManifestResourceNames();
-                    var match = all.FirstOrDefault(n => n.Contains("bgtrangchu"));
-                    if (match != null)
-                        stream = assembly.GetManifestResourceStream(match);
-                }
-
-                if (stream != null)
-                {
-                    var ms = new MemoryStream();
-                    stream.CopyTo(ms);
-                    stream.Dispose();
-                    var bytes = ms.ToArray();
-                    ImgBackground.Source = ImageSource.FromStream(() => new MemoryStream(bytes));
-                }
-                else
-                {
-                    // Last resort fallback
-                    ImgBackground.Source = "hinhnenapp.jpg";
-                }
-            }
-            catch
-            {
-                ImgBackground.Source = "hinhnenapp.jpg";
-            }
-        }
-
         private void OnLocalizationChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(LocalizationManager.CurrentLanguage))
+            if (string.IsNullOrEmpty(e.PropertyName) ||
+                e.PropertyName == nameof(LocalizationManager.CurrentLanguage))
             {
                 MainThread.BeginInvokeOnMainThread(UpdateUI);
             }
@@ -86,7 +85,6 @@ namespace VinhThucAudioGuide
             BtnStart.Text = lm.StartButton;
         }
 
-        // Nút chuyển sang tab Bản đồ (nằm trong Shell nên dùng GoToAsync)
         private async void BtnGoToMap_Clicked(object sender, EventArgs e)
         {
             await Shell.Current.GoToAsync("//MainPage");
