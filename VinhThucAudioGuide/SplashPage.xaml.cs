@@ -18,10 +18,19 @@ public partial class SplashPage : ContentPage
         {
             if (localDb != null && apiService != null)
             {
-                // 1. Đồng bộ dữ liệu POI
+                // 1. Kiểm tra lệnh Reset từ Admin
+                bool needsReset = await apiService.CheckResetFlagAsync();
+                if (needsReset)
+                {
+                    // Nếu Admin yêu cầu, xóa toàn bộ dữ liệu cũ để tải lại từ đầu
+                    await localDb.ClearAllDataAsync();
+                    Preferences.Default.Remove("LastSyncTime");
+                }
+
+                // 2. Đồng bộ dữ liệu POI
                 await localDb.SyncWithServerAsync(apiService);
 
-                // 2. Đăng ký thông tin thiết bị lên Server để Admin quản lý
+                // 3. Đăng ký thông tin thiết bị lên Server để Admin quản lý
                 var languages = await localDb.GetAllLanguages();
                 var defaultLangId = languages.FirstOrDefault()?.ServerId ?? Guid.Empty.ToString();
                 await apiService.RegisterDeviceAsync(defaultLangId);

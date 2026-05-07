@@ -11,7 +11,8 @@ public class ApiService
     // 1. Dùng http://10.0.2.2:5299/api/ nếu chạy trên GIẢ LẬP (Emulator)
     // 2. Dùng IP máy tính (VD: http://192.168.1.5:5299/api/) nếu chạy trên MÁY THẬT (Redmi 10C)
     // Bạn hãy thay địa chỉ IP dưới đây cho đúng với IP máy tính của bạn:
-    private const string BaseUrl = "http://192.168.1.13:5299/api/"; 
+    // Địa chỉ máy chủ trên mạng (Azure)
+    private const string BaseUrl = "https://locateandmultilingualnarration-amgrfua6fbd7gnce.eastasia-01.azurewebsites.net/api/"; 
 
     public ApiService()
     {
@@ -67,20 +68,14 @@ public class ApiService
         {
             if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return;
 
-            var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
-            if (string.IsNullOrEmpty(deviceId))
-            {
-                deviceId = Guid.NewGuid().ToString();
-                Preferences.Default.Set("UniqueDeviceId", deviceId);
-            }
+            var deviceId = GetOrCreateDeviceId();
 
             // Lấy languageId mặc định nếu không truyền vào
             if (string.IsNullOrEmpty(languageId))
             {
-                languageId = "00000000-0000-0000-0000-000000000000"; // Placeholder nếu chưa có dữ liệu
+                languageId = Guid.Empty.ToString();
             }
 
-            // Gửi ĐẦY ĐỦ dữ liệu mà DevicePreferenceUpsertDto yêu cầu để tránh bị Server từ chối
             var deviceDto = new
             {
                 DeviceId = deviceId,
@@ -93,9 +88,21 @@ public class ApiService
                 AutoPlay = true
             };
 
-            await _httpClient.PostAsJsonAsync("device-preference", deviceDto);
+            var response = await _httpClient.PostAsJsonAsync("device-preference", deviceDto);
+            System.Diagnostics.Debug.WriteLine($"[Heartbeat] Sent for {deviceId}. Status: {response.StatusCode}");
         }
-        catch { /* Bỏ qua lỗi heartbeat */ }
+        catch (Exception ex) 
+        { 
+            System.Diagnostics.Debug.WriteLine($"[Heartbeat] Error: {ex.Message}");
+            // Chỉ hiện thông báo này khi đang ở màn hình Splash để debug
+            if (Application.Current?.MainPage is SplashPage splash)
+            {
+                MainThread.BeginInvokeOnMainThread(async () => {
+                    await splash.DisplayAlert("Lỗi kết nối", 
+                        $"Không thể gửi tín hiệu tới Server tại {BaseUrl}. Lỗi: {ex.Message}. Vui lòng kiểm tra Wifi!", "OK");
+                });
+            }
+        }
     }
 
     /// <summary>
@@ -105,13 +112,58 @@ public class ApiService
     {
         try
         {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return;
+
             var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
             if (string.IsNullOrEmpty(deviceId)) return;
 
-            await _httpClient.PostAsync($"device-preference/{deviceId}/offline", null);
+            // Timeout ngắn để tránh treo app khi OnSleep
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            await _httpClient.PostAsync($"device-preference/{deviceId}/offline", null, cts.Token);
         }
         catch { }
     }
+
+    /// <summary>
+    /// Kiểm tra xem Admin có yêu cầu thiết bị này Reset dữ liệu hay không
+    /// </summary>
+    public async Task<bool> CheckResetFlagAsync()
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return false;
+
+            var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
+            if (string.IsNullOrEmpty(deviceId)) return false;
+
+            var response = await _httpClient.GetAsync($"device-preference/reset-flag?deviceId={deviceId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResult<bool>>();
+                return result?.Data ?? false;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    private string GetOrCreateDeviceId()
+    {
+        var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
+        if (string.IsNullOrEmpty(deviceId))
+        {
+            deviceId = Guid.NewGuid().ToString();
+            Preferences.Default.Set("UniqueDeviceId", deviceId);
+        }
+        return deviceId;
+    }
+}
+
+public class ApiResult<T>
+{
+    public bool Success { get; set; }
+    public T Data { get; set; }
+    public string Message { get; set; }
 }
 
 public class SyncDataResponse
