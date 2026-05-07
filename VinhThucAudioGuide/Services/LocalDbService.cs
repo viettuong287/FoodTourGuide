@@ -23,7 +23,7 @@ public class LocalDbService
         await _db.CreateTableAsync<QRCodeData>();
         await _db.CreateTableAsync<UserDevice>();
 
-        // await SeedData(); // Đã tắt dữ liệu mẫu HCM để đồng bộ thực tế từ Web CMS
+        await SeedData(); // Mở lại dữ liệu mẫu để App có nội dung ngay lập tức
     }
 
     public async Task<Dictionary<string, string>> GetScriptsForLocation(int locationId)
