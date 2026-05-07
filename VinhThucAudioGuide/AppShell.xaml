@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="VinhThucAudioGuide.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:VinhThucAudioGuide"
+    Shell.FlyoutBehavior="Disabled"
+    BackgroundColor="Black">
+
+    <Shell.Resources>
+        <ResourceDictionary>
+            <Style TargetType="TabBar">
+                <Setter Property="Shell.TabBarBackgroundColor" Value="White" />
+                <Setter Property="Shell.TabBarTitleColor" Value="#0055CC" />
+                <Setter Property="Shell.TabBarUnselectedColor" Value="Gray" />
+                <Setter Property="Shell.ForegroundColor" Value="#0055CC" />
+            </Style>
+        </ResourceDictionary>
+    </Shell.Resources>
+
+    <TabBar>
+        <!-- Tab 1: Trang chủ - hiện đầu tiên sau splash -->
+        <Tab x:Name="TabHome" Title="Trang chủ" Icon="ic_home.svg">
+            <ShellContent Route="HomePage"
+                          ContentTemplate="{DataTemplate local:HomePage}"
+                          Shell.BackgroundColor="Transparent" />
+        </Tab>
+
+        <!-- Tab 2: Bản đồ -->
+        <Tab x:Name="TabMap" Title="Bản đồ" Icon="ic_map.svg">
+            <ShellContent Route="MainPage" ContentTemplate="{DataTemplate local:MainPage}" />
+        </Tab>
+
+        <!-- Tab 3: Mã QR -->
+        <Tab x:Name="TabQr" Title="Mã QR" Icon="ic_qr.svg">
+            <ShellContent Route="QrPage" ContentTemplate="{DataTemplate local:QrPage}" />
+        </Tab>
+
+        <!-- Tab 4: Cài đặt -->
+        <Tab x:Name="TabSettings" Title="Cài đặt" Icon="ic_settings.svg">
+            <ShellContent Route="SettingsPage" ContentTemplate="{DataTemplate local:SettingsPage}" />
+        </Tab>
+    </TabBar>
+</Shell>

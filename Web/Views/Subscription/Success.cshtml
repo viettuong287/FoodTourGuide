@@ -1,0 +1,286 @@
+@{
+    ViewData["Title"] = "Thanh toán thành công";
+    var plan    = ViewBag.Plan as string ?? "Basic";
+    var orderId = ViewBag.OrderId is Guid g ? g.ToString() : ViewBag.OrderId?.ToString() ?? "";
+    var isPro   = plan == "Pro";
+
+    var features = isPro
+        ? new[] { "Không giới hạn quầy (stalls)", "Thuyết minh âm thanh (TTS)", "Đa ngôn ngữ nâng cao", "Phân tích nâng cao", "Xuất báo cáo", "Hỗ trợ ưu tiên 24/7" }
+        : new[] { "Tối đa 3 quầy (stalls)", "Thuyết minh âm thanh (TTS)", "Đa ngôn ngữ nâng cao", "Hỗ trợ tiêu chuẩn" };
+}
+
+@section Styles {
+<style>
+    :root {
+        --cream: #f7f3ed; --cream-dark: #ede8df; --ivory: #faf8f4;
+        --navy: #1e2d40; --navy-mid: #2c3e55; --navy-light: #3d5068;
+        --gold: #b8964e; --gold-light: #d4ae6a; --gold-pale: #f0e4c8;
+        --text-dark: #1e2d40; --text-mid: #4a5568; --text-light: #718096;
+        --border: #d9cfc2;
+        --green: #3a7d4f; --green-pale: rgba(58,125,79,0.08);
+        --shadow-sm: 0 1px 4px rgba(30,45,64,0.07);
+        --shadow-md: 0 4px 16px rgba(30,45,64,0.10);
+        --shadow-lg: 0 8px 40px rgba(30,45,64,0.14);
+        --radius: 12px; --radius-sm: 6px;
+    }
+
+    /* Page wrapper */
+    .success-page { max-width: 680px; margin: 0 auto; padding: 8px 0 40px; }
+
+    /* Confetti strip */
+    .confetti-bar {
+        height: 5px;
+        background: linear-gradient(90deg,
+            var(--gold) 0%, var(--gold-light) 20%,
+            var(--green) 40%, #4a9c6a 60%,
+            var(--gold) 80%, var(--gold-light) 100%);
+        border-radius: var(--radius) var(--radius) 0 0;
+        animation: shimmer 2.5s linear infinite;
+        background-size: 200% 100%;
+    }
+    @@keyframes shimmer { 0% { background-position:0% 0%; } 100% { background-position:200% 0%; } }
+
+    /* Main card */
+    .success-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 var(--radius) var(--radius);
+        box-shadow: var(--shadow-lg);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    /* Hero area */
+    .success-hero {
+        text-align: center;
+        padding: 44px 32px 36px;
+        background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 100%);
+        position: relative; overflow: hidden;
+    }
+    .success-hero::before { content:''; position:absolute; top:-30px; right:-30px; width:150px; height:150px; border-radius:50%; background:rgba(184,150,78,0.08); pointer-events:none; }
+    .success-hero::after  { content:''; position:absolute; bottom:-40px; left:-20px; width:120px; height:120px; border-radius:50%; background:rgba(58,125,79,0.08); pointer-events:none; }
+
+    /* Animated checkmark */
+    .check-circle {
+        width: 80px; height: 80px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--green), #4a9c6a);
+        display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 22px;
+        box-shadow: 0 0 0 0 rgba(58,125,79,0.4);
+        animation: pulse-green 2s ease-out 0.3s both;
+    }
+    .check-circle i { font-size: 36px; color: #fff; animation: pop-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275) 0.2s both; }
+    @@keyframes pulse-green {
+        0%   { box-shadow: 0 0 0 0 rgba(58,125,79,0.5); }
+        50%  { box-shadow: 0 0 0 20px rgba(58,125,79,0); }
+        100% { box-shadow: 0 0 0 0 rgba(58,125,79,0); }
+    }
+    @@keyframes pop-in {
+        0%   { opacity:0; transform:scale(0.3); }
+        100% { opacity:1; transform:scale(1); }
+    }
+
+    .success-title { font-size: 1.8rem; font-weight: 800; color: var(--cream); margin-bottom: 8px; }
+    .success-subtitle { font-size: 14px; color: rgba(247,243,237,0.65); margin: 0; line-height: 1.6; }
+
+    /* Plan pill */
+    .plan-activated-pill {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: rgba(184,150,78,0.18); border: 1px solid rgba(184,150,78,0.4);
+        color: var(--gold-light); font-size: 13px; font-weight: 700;
+        padding: 6px 18px; border-radius: 20px; margin: 18px auto 0;
+        letter-spacing: 0.04em;
+    }
+    .plan-activated-pill i { font-size: 15px; }
+
+    /* Body */
+    .success-body { padding: 32px; }
+
+    /* Order info */
+    .order-info {
+        background: var(--green-pale);
+        border: 1px solid rgba(58,125,79,0.2);
+        border-radius: var(--radius-sm);
+        padding: 16px 20px;
+        margin-bottom: 28px;
+        display: flex; align-items: flex-start; gap: 14px;
+    }
+    .order-info-icon { font-size: 22px; color: var(--green); flex-shrink: 0; margin-top: 1px; }
+    .order-info-label { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--green); margin-bottom: 3px; }
+    .order-info-id { font-family: monospace; font-size: 13.5px; color: var(--text-dark); word-break: break-all; font-weight: 600; }
+    .order-info-note { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+
+    /* Features unlocked */
+    .unlocked-title {
+        font-size: 13px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.07em; color: var(--text-light); margin-bottom: 14px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .unlocked-title::before { content:''; flex:1; height:1px; background:var(--border); }
+    .unlocked-title::after  { content:''; flex:1; height:1px; background:var(--border); }
+    .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 32px; }
+    .feature-chip {
+        display: flex; align-items: center; gap: 9px;
+        background: #fff; border: 1px solid var(--border);
+        border-radius: var(--radius-sm); padding: 10px 14px;
+        font-size: 13px; color: var(--text-dark);
+        animation: fadeUp 0.4s ease both;
+    }
+    .feature-chip i { color: var(--green); font-size: 15px; flex-shrink: 0; }
+
+    /* Next steps */
+    .next-steps-title {
+        font-size: 13px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.07em; color: var(--text-light); margin-bottom: 14px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .next-steps-title::before { content:''; flex:1; height:1px; background:var(--border); }
+    .next-steps-title::after  { content:''; flex:1; height:1px; background:var(--border); }
+    .next-steps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 32px; }
+    .next-step-btn {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 8px; padding: 18px 14px;
+        background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+        text-decoration: none; color: var(--text-dark);
+        font-size: 13px; font-weight: 600;
+        transition: all 0.2s; text-align: center;
+    }
+    .next-step-btn:hover { border-color: var(--gold); background: var(--gold-pale); color: var(--navy); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+    .next-step-btn i { font-size: 24px; color: var(--gold); }
+    .next-step-btn .step-desc { font-size: 12px; font-weight: 400; color: var(--text-light); margin-top: 2px; }
+
+    /* Primary CTA */
+    .btn-cta-primary {
+        display: flex; align-items: center; justify-content: center; gap: 9px;
+        width: 100%; padding: 14px 24px;
+        background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        color: var(--navy); border: none; border-radius: var(--radius-sm);
+        font-size: 15px; font-weight: 700; text-decoration: none;
+        box-shadow: 0 4px 16px rgba(184,150,78,0.35);
+        transition: all 0.2s; cursor: pointer; letter-spacing: 0.02em;
+    }
+    .btn-cta-primary:hover { box-shadow: 0 6px 24px rgba(184,150,78,0.45); transform: translateY(-1px); color: var(--navy); }
+
+    /* Support note */
+    .support-note {
+        text-align: center; font-size: 12.5px; color: var(--text-light);
+        margin-top: 18px; line-height: 1.6;
+    }
+    .support-note a { color: var(--gold); text-decoration: none; }
+    .support-note a:hover { text-decoration: underline; }
+
+    @@keyframes fadeUp {
+        from { opacity:0; transform:translateY(10px); }
+        to   { opacity:1; transform:translateY(0); }
+    }
+    @{
+        var chips = features.Length;
+        for (int i = 0; i < chips; i++) {
+            @:.feature-chip:nth-child(@(i+1)) { animation-delay: @(0.05 + i * 0.06)s; }
+        }
+    }
+    .success-card { animation: fadeUp 0.5s ease 0.05s both; }
+
+    @@media (max-width: 540px) {
+        .features-grid { grid-template-columns: 1fr; }
+        .next-steps-grid { grid-template-columns: 1fr 1fr; }
+        .success-hero { padding: 32px 20px 28px; }
+        .success-body { padding: 24px 20px; }
+        .success-title { font-size: 1.5rem; }
+    }
+</style>
+}
+
+<div class="success-page">
+
+    <!-- Confetti bar -->
+    <div class="confetti-bar"></div>
+
+    <!-- Main card -->
+    <div class="success-card">
+
+        <!-- Hero -->
+        <div class="success-hero">
+            <div class="check-circle">
+                <i class="bi bi-check-lg"></i>
+            </div>
+            <div class="success-title">Thanh toán thành công!</div>
+            <p class="success-subtitle">
+                Gói dịch vụ của bạn đã được kích hoạt.<br>
+                Bắt đầu sử dụng đầy đủ tính năng ngay bây giờ.
+            </p>
+            <div class="plan-activated-pill">
+                <i class="bi @(isPro ? "bi-star-fill" : "bi-shield-check")"></i>
+                Gói @plan đã được kích hoạt
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="success-body">
+
+            <!-- Order ID -->
+            <div class="order-info">
+                <i class="bi bi-receipt order-info-icon"></i>
+                <div>
+                    <div class="order-info-label">Mã đơn hàng</div>
+                    <div class="order-info-id">@orderId</div>
+                    <div class="order-info-note">
+                        Lưu lại mã này để tra cứu lịch sử thanh toán.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features unlocked -->
+            <div class="unlocked-title">Tính năng đã mở khoá</div>
+            <div class="features-grid">
+                @foreach (var f in features)
+                {
+                    <div class="feature-chip">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>@f</span>
+                    </div>
+                }
+            </div>
+
+            <!-- Next steps -->
+            <div class="next-steps-title">Bước tiếp theo</div>
+            <div class="next-steps-grid">
+                <a asp-controller="Stall" asp-action="Index" class="next-step-btn">
+                    <i class="bi bi-shop-window"></i>
+                    Quản lý Stalls
+                    <span class="step-desc">Thêm và cấu hình quầy hàng</span>
+                </a>
+                <a asp-controller="Narration" asp-action="StallNarrationContents" class="next-step-btn">
+                    <i class="bi bi-volume-up"></i>
+                    Thuyết minh
+                    <span class="step-desc">Tạo nội dung âm thanh</span>
+                </a>
+                <a asp-controller="Business" asp-action="Index" class="next-step-btn">
+                    <i class="bi bi-building"></i>
+                    Business
+                    <span class="step-desc">Xem thông tin business</span>
+                </a>
+                <a asp-controller="Admin" asp-action="SubscriptionOrders" class="next-step-btn">
+                    <i class="bi bi-receipt"></i>
+                    Lịch sử đơn hàng
+                    <span class="step-desc">Xem lại giao dịch</span>
+                </a>
+            </div>
+
+            <!-- CTA -->
+            <a asp-controller="Admin" asp-action="Dashboard" class="btn-cta-primary">
+                <i class="bi bi-speedometer2"></i>
+                Đến Dashboard
+            </a>
+
+            <div class="support-note">
+                Gặp vấn đề? Liên hệ hỗ trợ qua
+                <a asp-controller="Home" asp-action="Privacy">trang hỗ trợ</a>
+                hoặc xem
+                <a asp-controller="Subscription" asp-action="Plans">các gói dịch vụ</a>.
+            </div>
+        </div>
+    </div>
+
+</div>

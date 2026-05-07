@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="VinhThucAudioGuide.HomePage"
+             BackgroundColor="Transparent"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="*, Auto" Padding="0">
+
+        <!-- Vùng nội dung giữa màn hình -->
+        <VerticalStackLayout Grid.Row="0"
+                             VerticalOptions="Center"
+                             Padding="24,0"
+                             Spacing="0">
+
+            <!-- Card nền tối chứa text - giúp chữ nổi bật trên ảnh sáng -->
+            <Border BackgroundColor="#CC000000"
+                    StrokeThickness="0"
+                    Padding="28,32"
+                    Margin="0,0,0,0">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="24"/>
+                </Border.StrokeShape>
+
+                <VerticalStackLayout Spacing="0">
+
+                    <Label Text="🏙️"
+                           FontSize="56"
+                           HorizontalOptions="Center"
+                           Margin="0,0,0,12"/>
+
+                    <Label x:Name="LblTitle"
+                           FontSize="28"
+                           FontAttributes="Bold"
+                           HorizontalTextAlignment="Center"
+                           TextColor="White"
+                           LineHeight="1.2"
+                           Margin="0,0,0,12"/>
+
+                    <!-- Đường kẻ vàng trang trí -->
+                    <BoxView HeightRequest="2" WidthRequest="60" Color="#FFCC00"
+                             HorizontalOptions="Center" Margin="0,0,0,16" CornerRadius="1"/>
+
+                    <Label x:Name="LblDesc"
+                           HorizontalTextAlignment="Center"
+                           FontSize="14"
+                           TextColor="#E8E8E8"
+                           LineHeight="1.5"
+                           Margin="0,0,0,12"/>
+
+                    <Label Text="v1.0.0"
+                           FontSize="12"
+                           HorizontalOptions="Center"
+                           TextColor="#AAAAAA"/>
+
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+
+        <!-- Nút bắt đầu bám dưới -->
+        <VerticalStackLayout Grid.Row="1" Padding="32,0,32,52">
+            <Button x:Name="BtnStart"
+                    BackgroundColor="#FFCC00"
+                    TextColor="#111111"
+                    FontAttributes="Bold"
+                    FontSize="16"
+                    CornerRadius="32"
+                    HeightRequest="58"
+                    Clicked="BtnGoToMap_Clicked">
+                <Button.Shadow>
+                    <Shadow Brush="Black" Offset="0,4" Opacity="0.5" Radius="8"/>
+                </Button.Shadow>
+            </Button>
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentPage>

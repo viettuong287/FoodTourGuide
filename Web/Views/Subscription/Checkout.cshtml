@@ -1,0 +1,525 @@
+@model Web.Models.CheckoutViewModel
+@{
+    ViewData["Title"] = $"Thanh toán gói {Model.Plan}";
+    var isPro   = Model.Plan == "Pro";
+    var features = isPro
+        ? new[] { "Không giới hạn quầy (stalls)", "Thuyết minh âm thanh (TTS)", "Phân tích nâng cao", "Ưu tiên hỗ trợ", "Tất cả tính năng Basic" }
+        : new[] { "Tối đa 3 quầy (stalls)", "Thuyết minh âm thanh (TTS)", "Quản lý nội dung đa ngôn ngữ", "Hỗ trợ tiêu chuẩn" };
+}
+
+@section Styles {
+<style>
+    :root {
+        --cream: #f7f3ed; --cream-dark: #ede8df; --ivory: #faf8f4;
+        --navy: #1e2d40; --navy-mid: #2c3e55; --navy-light: #3d5068;
+        --gold: #b8964e; --gold-light: #d4ae6a; --gold-pale: #f0e4c8;
+        --text-dark: #1e2d40; --text-mid: #4a5568; --text-light: #718096;
+        --border: #d9cfc2;
+        --shadow-sm: 0 1px 4px rgba(30,45,64,0.07);
+        --shadow-md: 0 4px 16px rgba(30,45,64,0.10);
+        --shadow-lg: 0 8px 32px rgba(30,45,64,0.13);
+        --radius: 10px; --radius-sm: 6px;
+    }
+
+    .breadcrumb { background: transparent; padding: 0 0 12px; margin-bottom: 20px; font-size: 13px; }
+    .breadcrumb-item a { color: var(--text-mid); text-decoration: none; transition: color 0.15s; }
+    .breadcrumb-item a:hover { color: var(--gold); }
+    .breadcrumb-item.active { color: var(--text-light); }
+    .breadcrumb-item + .breadcrumb-item::before { color: var(--border); }
+
+    /* Checkout layout */
+    .checkout-grid {
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        gap: 28px;
+        align-items: start;
+        max-width: 960px;
+        margin: 0 auto;
+    }
+
+    /* Summary card */
+    .summary-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        position: sticky;
+        top: 24px;
+    }
+    .summary-header {
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+        padding: 28px 28px 24px;
+        position: relative;
+        overflow: hidden;
+    }
+    .summary-header::before {
+        content: '';
+        position: absolute; top: -20px; right: -20px;
+        width: 120px; height: 120px; border-radius: 50%;
+        background: rgba(184,150,78,0.10); pointer-events: none;
+    }
+    .plan-badge-lg {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(184,150,78,0.15); border: 1px solid rgba(184,150,78,0.35);
+        color: var(--gold-light); font-size: 12px; font-weight: 700;
+        padding: 4px 12px; border-radius: 20px; letter-spacing: 0.06em;
+        text-transform: uppercase; margin-bottom: 10px;
+    }
+    .summary-plan-name {
+        font-size: 1.8rem; font-weight: 800; color: var(--cream);
+        line-height: 1; margin-bottom: 6px;
+    }
+    .summary-plan-name span { color: var(--gold-light); }
+    .summary-tagline { font-size: 13px; color: rgba(247,243,237,0.65); }
+    .summary-price-wrap { margin-top: 20px; display: flex; align-items: baseline; gap: 6px; }
+    .summary-price { font-size: 2.4rem; font-weight: 800; color: var(--cream); line-height: 1; }
+    .summary-price-unit { font-size: 13px; color: rgba(247,243,237,0.55); }
+    .summary-body { padding: 24px 28px; }
+    .summary-section-title {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.1em; color: var(--text-light); margin-bottom: 12px;
+    }
+    .feature-list { list-style: none; padding: 0; margin: 0 0 24px; display: flex; flex-direction: column; gap: 9px; }
+    .feature-list li { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--text-dark); }
+    .feature-list li i { color: #3a7d4f; font-size: 15px; flex-shrink: 0; }
+    .summary-divider { border: none; border-top: 1px solid var(--border); margin: 0 0 20px; }
+    .summary-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13.5px; }
+    .summary-row .label { color: var(--text-light); }
+    .summary-row .value { font-weight: 600; color: var(--text-dark); }
+    .summary-total { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 2px solid var(--border); }
+    .summary-total .label { font-size: 14px; font-weight: 700; color: var(--text-dark); }
+    .summary-total .value { font-size: 1.4rem; font-weight: 800; color: var(--navy); }
+    .business-select-item { display: flex; flex-direction: column; }
+    .business-select-item .biz-plan-tag { font-size: 11px; color: var(--gold); font-weight: 600; }
+
+    /* Payment card */
+    .payment-card {
+        background: var(--ivory);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+    .payment-header {
+        background: var(--cream-dark);
+        border-bottom: 1px solid var(--border);
+        padding: 18px 28px;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .payment-header-title { font-size: 15px; font-weight: 700; color: var(--text-dark); }
+    .payment-header-icons { margin-left: auto; display: flex; gap: 6px; }
+    .card-icon { width: 34px; height: 22px; border: 1px solid var(--border); border-radius: 4px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: var(--text-mid); }
+    .payment-body { padding: 28px; }
+    .form-label { font-size: 13px; font-weight: 600; color: var(--text-dark); margin-bottom: 6px; }
+    .form-label.required::after { content: ' *'; color: #a2493a; }
+    .form-control, .form-select {
+        border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+        padding: 11px 14px; font-size: 14px; color: var(--text-dark);
+        background: #fff; transition: all 0.2s; width: 100%;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,150,78,0.12);
+        outline: none;
+    }
+    .form-control.card-number-input { font-family: 'Courier New', monospace; font-size: 16px; letter-spacing: 0.1em; }
+    .form-control.is-invalid { border-color: #a2493a; }
+    .invalid-feedback { font-size: 12px; color: #a2493a; margin-top: 4px; display: none; }
+    .form-control.is-invalid ~ .invalid-feedback { display: block; }
+    .form-text { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+
+    /* Card preview strip */
+    .card-preview {
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+        border-radius: var(--radius-sm); padding: 18px 20px; margin-bottom: 24px;
+        position: relative; overflow: hidden;
+    }
+    .card-preview::before {
+        content: ''; position: absolute; top: -12px; right: -12px;
+        width: 80px; height: 80px; border-radius: 50%;
+        background: rgba(184,150,78,0.12); pointer-events: none;
+    }
+    .card-preview-number { font-family: 'Courier New', monospace; font-size: 15px; color: rgba(247,243,237,0.9); letter-spacing: 0.15em; margin-bottom: 12px; }
+    .card-preview-row { display: flex; justify-content: space-between; align-items: flex-end; }
+    .card-preview-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(247,243,237,0.45); margin-bottom: 2px; }
+    .card-preview-value { font-size: 13px; font-weight: 600; color: rgba(247,243,237,0.9); letter-spacing: 0.04em; }
+
+    /* Mock hint */
+    .mock-hint {
+        background: rgba(184,150,78,0.08); border: 1px dashed rgba(184,150,78,0.4);
+        border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 20px;
+        font-size: 12.5px; color: #7a5c1e;
+        display: flex; gap: 8px; align-items: flex-start;
+    }
+    .mock-hint i { flex-shrink: 0; margin-top: 1px; }
+    .mock-hint code { background: rgba(184,150,78,0.15); padding: 1px 5px; border-radius: 3px; font-size: 12px; letter-spacing: 0.05em; }
+
+    /* Secure badge */
+    .secure-badge {
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+        font-size: 12px; color: var(--text-light); margin-top: 16px;
+    }
+    .secure-badge i { color: #3a7d4f; font-size: 14px; }
+
+    /* Submit button */
+    .btn-pay {
+        width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold-light));
+        color: var(--navy); border: none; font-weight: 700; font-size: 15px;
+        padding: 14px 24px; border-radius: var(--radius-sm);
+        box-shadow: 0 4px 16px rgba(184,150,78,0.35);
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em;
+    }
+    .btn-pay:hover { box-shadow: 0 6px 24px rgba(184,150,78,0.45); transform: translateY(-1px); }
+    .btn-pay:active { transform: translateY(0); }
+    .btn-pay:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+    .btn-back {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 13px; color: var(--text-light); text-decoration: none;
+        transition: color 0.15s; margin-bottom: 20px;
+    }
+    .btn-back:hover { color: var(--navy); }
+
+    .text-danger { color: #a2493a !important; }
+    .validation-summary-valid { display: none !important; }
+    .alert-danger { border-radius: var(--radius-sm); font-size: 13.5px; }
+
+    @@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .anim-1 { animation: fadeUp 0.4s ease 0.05s both; }
+    .anim-2 { animation: fadeUp 0.4s ease 0.12s both; }
+
+    @@media (max-width: 860px) {
+        .checkout-grid { grid-template-columns: 1fr; }
+        .summary-card { position: static; order: -1; }
+    }
+</style>
+}
+
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Home</a></li>
+        <li class="breadcrumb-item"><a asp-controller="Subscription" asp-action="Plans">Gói dịch vụ</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Thanh toán</li>
+    </ol>
+</nav>
+
+<a asp-controller="Subscription" asp-action="Plans" class="btn-back">
+    <i class="bi bi-arrow-left"></i>Quay lại chọn gói
+</a>
+
+<div class="checkout-grid">
+
+    <!-- LEFT: Payment Form -->
+    <div class="anim-1">
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="alert alert-danger d-flex gap-2 align-items-start mb-4" role="alert">
+                <i class="bi bi-exclamation-circle-fill flex-shrink-0 mt-1"></i>
+                <span>@Model.ErrorMessage</span>
+            </div>
+        }
+
+        <div class="payment-card">
+            <div class="payment-header">
+                <i class="bi bi-credit-card" style="color:var(--gold);font-size:18px;"></i>
+                <span class="payment-header-title">Thông tin thanh toán</span>
+                <div class="payment-header-icons">
+                    <div class="card-icon">VISA</div>
+                    <div class="card-icon" style="color:#eb5757;">MC</div>
+                    <div class="card-icon" style="color:#2563eb;">JCB</div>
+                </div>
+            </div>
+            <div class="payment-body">
+
+                <!-- Mock hint -->
+                <div class="mock-hint">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <div>
+                        <strong>Môi trường thử nghiệm.</strong>
+                        Dùng thẻ giả: <code>4111 1111 1111 1111</code> · hết hạn <code>12/99</code> · CVV <code>123</code>
+                    </div>
+                </div>
+
+                <form asp-action="ProcessPayment" method="post" id="checkoutForm" novalidate>
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Plan"       value="@Model.Plan" />
+                    <input type="hidden" name="Amount"     value="@Model.Amount" />
+
+                    <!-- Business selector -->
+                    <div class="mb-4">
+                        <label class="form-label required">Business đăng ký</label>
+                        <select name="BusinessId" class="form-select" id="businessSelect" required
+                                onchange="updateBusinessPreview(this)">
+                            @foreach (var b in Model.Businesses)
+                            {
+                                <option value="@b.Id"
+                                        data-plan="@(b.ActivePlan ?? "")"
+                                        data-expires="@(b.PlanExpiresAt?.ToString("dd/MM/yyyy") ?? "")"
+                                        selected="@(b.Id == Model.BusinessId ? "selected" : null)">
+                                    @b.Name
+                                </option>
+                            }
+                        </select>
+                        <div id="businessPlanInfo" class="form-text" style="margin-top:6px;"></div>
+                    </div>
+
+                    <!-- Card preview -->
+                    <div class="card-preview">
+                        <div class="card-preview-number" id="previewNumber">•••• •••• •••• ••••</div>
+                        <div class="card-preview-row">
+                            <div>
+                                <div class="card-preview-label">Chủ thẻ</div>
+                                <div class="card-preview-value" id="previewHolder">TÊN CHỦ THẺ</div>
+                            </div>
+                            <div>
+                                <div class="card-preview-label">Hết hạn</div>
+                                <div class="card-preview-value" id="previewExpiry">MM/YY</div>
+                            </div>
+                            <div>
+                                <div class="card-preview-label" style="text-align:right;">Gói</div>
+                                <div class="card-preview-value" style="text-align:right;color:var(--gold-light);">@Model.Plan</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card number -->
+                    <div class="mb-3">
+                        <label class="form-label required">Số thẻ</label>
+                        <input type="text"
+                               name="CardNumber"
+                               id="cardNumber"
+                               class="form-control card-number-input"
+                               placeholder="1234 5678 9012 3456"
+                               maxlength="19"
+                               autocomplete="cc-number"
+                               inputmode="numeric"
+                               value="@Model.CardNumber"
+                               required />
+                        <span asp-validation-for="CardNumber" class="text-danger" style="font-size:12px;"></span>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <!-- Expiry -->
+                        <div class="col-6">
+                            <label class="form-label required">Ngày hết hạn</label>
+                            <input type="text"
+                                   name="CardExpiry"
+                                   id="cardExpiry"
+                                   class="form-control"
+                                   placeholder="MM/YY"
+                                   maxlength="5"
+                                   autocomplete="cc-exp"
+                                   inputmode="numeric"
+                                   value="@Model.CardExpiry"
+                                   required />
+                            <span asp-validation-for="CardExpiry" class="text-danger" style="font-size:12px;"></span>
+                        </div>
+                        <!-- CVV -->
+                        <div class="col-6">
+                            <label class="form-label required">CVV</label>
+                            <div style="position:relative;">
+                                <input type="password"
+                                       name="CardCvv"
+                                       id="cardCvv"
+                                       class="form-control"
+                                       placeholder="•••"
+                                       maxlength="4"
+                                       autocomplete="cc-csc"
+                                       inputmode="numeric"
+                                       value="@Model.CardCvv"
+                                       required />
+                                <button type="button"
+                                        onclick="toggleCvv()"
+                                        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-light);cursor:pointer;padding:0;font-size:14px;"
+                                        title="Hiện/ẩn CVV">
+                                    <i class="bi bi-eye" id="cvvEyeIcon"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="CardCvv" class="text-danger" style="font-size:12px;"></span>
+                        </div>
+                    </div>
+
+                    <!-- Cardholder -->
+                    <div class="mb-4">
+                        <label class="form-label">Tên chủ thẻ</label>
+                        <input type="text"
+                               name="CardHolder"
+                               id="cardHolder"
+                               class="form-control"
+                               placeholder="NGUYEN VAN A"
+                               maxlength="128"
+                               autocomplete="cc-name"
+                               value="@Model.CardHolder"
+                               style="text-transform:uppercase;" />
+                        <span asp-validation-for="CardHolder" class="text-danger" style="font-size:12px;"></span>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn-pay" id="btnPay">
+                        <i class="bi bi-lock-fill"></i>
+                        Thanh toán @Model.Amount.ToString("N0") ₫
+                    </button>
+
+                    <div class="secure-badge">
+                        <i class="bi bi-shield-check"></i>
+                        Giao dịch được mã hoá SSL/TLS
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Order Summary -->
+    <div class="anim-2">
+        <div class="summary-card">
+            <div class="summary-header">
+                <div class="plan-badge-lg">
+                    <i class="bi @(isPro ? "bi-star-fill" : "bi-shield-check")"></i>
+                    Gói @Model.Plan
+                </div>
+                <div class="summary-plan-name">
+                    @if (isPro) { <text>Market <span>Pro</span></text> }
+                    else { <text>Market <span>Basic</span></text> }
+                </div>
+                <div class="summary-tagline">
+                    @(isPro ? "Giải pháp toàn diện cho thị trường lớn" : "Khởi đầu hoàn hảo cho doanh nghiệp vừa và nhỏ")
+                </div>
+                <div class="summary-price-wrap">
+                    <div class="summary-price">@Model.Amount.ToString("N0")₫</div>
+                    <div class="summary-price-unit">/ tháng</div>
+                </div>
+            </div>
+
+            <div class="summary-body">
+                <div class="summary-section-title">Bao gồm</div>
+                <ul class="feature-list">
+                    @foreach (var f in features)
+                    {
+                        <li><i class="bi bi-check-circle-fill"></i>@f</li>
+                    }
+                </ul>
+
+                <hr class="summary-divider" />
+
+                <div class="summary-section-title">Chi tiết đơn hàng</div>
+                <div class="summary-row">
+                    <span class="label">Gói</span>
+                    <span class="value">@Model.Plan</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Thời hạn</span>
+                    <span class="value">1 tháng</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Business</span>
+                    <span class="value" id="summaryBizName">
+                        @(Model.Businesses.FirstOrDefault(b => b.Id == Model.BusinessId)?.Name ?? "—")
+                    </span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Đơn giá</span>
+                    <span class="value">@Model.Amount.ToString("N0") ₫</span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Giảm giá</span>
+                    <span class="value">0 ₫</span>
+                </div>
+                <div class="summary-total">
+                    <span class="label">Tổng cộng</span>
+                    <span class="value">@Model.Amount.ToString("N0") ₫</span>
+                </div>
+
+                <div style="margin-top:20px;padding:12px 14px;background:var(--cream-dark);border-radius:var(--radius-sm);font-size:12px;color:var(--text-light);line-height:1.6;">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Gói sẽ được kích hoạt ngay sau khi thanh toán thành công và có hiệu lực trong <strong>30 ngày</strong>.
+                    Nếu business đang có gói còn hạn, thời gian mới sẽ được cộng dồn.
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+<partial name="_ValidationScriptsPartial" />
+<script>
+    // --- Card number formatting ---
+    document.getElementById('cardNumber').addEventListener('input', function (e) {
+        let v = e.target.value.replace(/\D/g, '').substring(0, 16);
+        e.target.value = v.replace(/(.{4})/g, '$1 ').trim();
+        document.getElementById('previewNumber').textContent =
+            v.padEnd(16, '•').replace(/(.{4})/g, '$1 ').trim();
+    });
+
+    // --- Expiry formatting ---
+    document.getElementById('cardExpiry').addEventListener('input', function (e) {
+        let v = e.target.value.replace(/\D/g, '').substring(0, 4);
+        if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+        e.target.value = v;
+        document.getElementById('previewExpiry').textContent = v || 'MM/YY';
+    });
+
+    // --- Cardholder preview ---
+    document.getElementById('cardHolder').addEventListener('input', function (e) {
+        const v = e.target.value.toUpperCase().trim();
+        document.getElementById('previewHolder').textContent = v || 'TÊN CHỦ THẺ';
+        e.target.value = e.target.value.toUpperCase();
+    });
+
+    // --- CVV toggle ---
+    function toggleCvv() {
+        const input = document.getElementById('cardCvv');
+        const icon  = document.getElementById('cvvEyeIcon');
+        input.type  = input.type === 'password' ? 'text' : 'password';
+        icon.className = input.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+    }
+
+    // --- Business selector ---
+    function updateBusinessPreview(sel) {
+        const opt     = sel.options[sel.selectedIndex];
+        const plan    = opt.dataset.plan;
+        const expires = opt.dataset.expires;
+        const info    = document.getElementById('businessPlanInfo');
+        const summaryBiz = document.getElementById('summaryBizName');
+
+        summaryBiz.textContent = opt.text;
+
+        if (plan) {
+            info.innerHTML = `<i class="bi bi-info-circle" style="color:var(--gold);"></i>
+                Business đang dùng gói <strong>${plan}</strong> đến <strong>${expires}</strong>.
+                Thời gian mới sẽ được <em>cộng dồn</em> sau ngày hết hạn.`;
+            info.style.color = '#7a5c1e';
+        } else {
+            info.textContent = '';
+        }
+    }
+
+    // --- Submit loading state ---
+    document.getElementById('checkoutForm').addEventListener('submit', function () {
+        const btn = document.getElementById('btnPay');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Đang xử lý...';
+    });
+
+    // --- Init ---
+    document.addEventListener('DOMContentLoaded', function () {
+        // Trigger business info on load
+        const sel = document.getElementById('businessSelect');
+        if (sel) updateBusinessPreview(sel);
+
+        // Restore card number preview nếu có giá trị từ server (validation fail)
+        const cn = document.getElementById('cardNumber').value;
+        if (cn) {
+            const digits = cn.replace(/\D/g, '').padEnd(16, '•');
+            document.getElementById('previewNumber').textContent =
+                digits.replace(/(.{4})/g, '$1 ').trim();
+        }
+        const exp = document.getElementById('cardExpiry').value;
+        if (exp) document.getElementById('previewExpiry').textContent = exp;
+
+        const holder = document.getElementById('cardHolder').value;
+        if (holder) document.getElementById('previewHolder').textContent = holder.toUpperCase();
+    });
+</script>
+}

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:mapsui="clr-namespace:Mapsui.UI.Maui;assembly=Mapsui.UI.Maui"
+             xmlns:local="clr-namespace:VinhThucAudioGuide"
+             x:Class="VinhThucAudioGuide.MainPage">
+
+    <!-- Cấu trúc chia màn hình làm 5 phần -->
+    <Grid RowDefinitions="Auto, 4*, Auto, 3*, Auto">
+
+        <!-- 2. BẢN ĐỒ & NÚT GPS (Đã sửa thành Fill để tràn viền) -->
+        <Grid Grid.Row="1">
+            <mapsui:MapView x:Name="mapView" 
+                            VerticalOptions="Fill" 
+                            HorizontalOptions="Fill" />
+
+            <Button x:Name="btnGps"
+                    Text="📍 Vị trí"
+                    FontAttributes="Bold"
+                    TextColor="Black"
+                    BackgroundColor="#F0F0F0"
+                    CornerRadius="20"
+                    WidthRequest="90"
+                    HeightRequest="40"
+                    Margin="15"
+                    HorizontalOptions="End"
+                    VerticalOptions="End"
+                    Shadow="{Shadow Brush=Black, Offset='0,2', Opacity=0.3}"
+                    Clicked="MyLocation_Clicked" />
+        </Grid>
+
+        <!-- 3. BỘ LỌC DANH MỤC -->
+        <HorizontalStackLayout Grid.Row="2" HorizontalOptions="Center" Spacing="15" Margin="0,15,0,10">
+            <Button x:Name="BtnFoodCategory" Text="🍴 Thức ăn" BackgroundColor="#d4a017" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
+            <Button x:Name="BtnFunCategory" Text="🏛️ Vui chơi" BackgroundColor="#1565c0" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
+            <Button x:Name="BtnFestivalCategory" Text="🎉 Lễ hội" BackgroundColor="#6a1b9a" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
+        </HorizontalStackLayout>
+
+        <!-- 4. DANH SÁCH ĐỊA ĐIỂM (Đã dùng Border thay Frame & Chống liệt cảm ứng) -->
+        <CollectionView x:Name="cvPoiList" 
+                        Grid.Row="3" 
+                        SelectionMode="Single" 
+                        SelectionChanged="Poi_Selected" 
+                        Margin="15,0">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <!-- Đổi sang Border để chuẩn MAUI mới -->
+                    <Border Padding="10" Margin="0,0,0,10" BackgroundColor="#E8E8E8" Stroke="Transparent">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+                        
+
+                        <!-- Ảnh thu gọn thành ô vuông, cố định kích thước để không bị kéo giãn -->
+                        <Grid ColumnDefinitions="90, *">
+
+                            <Border Grid.RowSpan="2" Grid.Column="0" WidthRequest="72" HeightRequest="72" BackgroundColor="#CCCCCC" Padding="0">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8" />
+                                </Border.StrokeShape>
+                                <Image Source="{Binding ImageUrl}" Aspect="AspectFill" VerticalOptions="Center" HorizontalOptions="Center"/>
+                            </Border>
+
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4" Margin="15,0,0,0">
+                                <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="16" TextColor="#333333"/>
+                                <HorizontalStackLayout Spacing="5">
+                                    <Label Text="⭐" FontSize="12"/>
+                                    <Label Text="{Binding Rating}" FontSize="13" TextColor="#d4a017" FontAttributes="Bold"/>
+                                    <Label Text="•" FontSize="13" TextColor="#777777"/>
+                                    <Label Text="{Binding DisplayCategory}" FontSize="13" TextColor="#777777"/>
+                                </HorizontalStackLayout>
+                                <Label Text="{Binding Source={x:Static local:LocalizationManager.Instance}, Path=TapToViewRoute}" FontSize="12" TextColor="#1976D2" FontAttributes="Italic"/>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- 5. NÚT NGHE/DỪNG THUYẾT MINH -->
+        <Grid Grid.Row="4" ColumnDefinitions="*, *" Margin="15,5,15,15" ColumnSpacing="15">
+            <Button x:Name="BtnListen" Grid.Column="0" 
+                    Text="🎧 Nghe thuyết minh" 
+                    BackgroundColor="#2e7d32" 
+                    TextColor="White" 
+                    FontAttributes="Bold" 
+                    CornerRadius="8" 
+                    HeightRequest="45"
+                    Clicked="Speak_Clicked"/>
+
+            <Button x:Name="BtnStop" Grid.Column="1" 
+                    Text="⏹️ Dừng" 
+                    BackgroundColor="#c62828" 
+                    TextColor="White" 
+                    FontAttributes="Bold" 
+                    CornerRadius="8" 
+                    HeightRequest="45"
+                    Clicked="StopSpeech_Clicked"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>
