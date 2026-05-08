@@ -24,7 +24,7 @@ public class LocalDbService
         await _db.CreateTableAsync<UserDevice>();
 
         // await SeedData(); // Tắt dữ liệu mẫu để chỉ hiển thị dữ liệu thực tế từ Web CMS
-    }gi
+    }
 
     public async Task ClearAllDataAsync()
     {
@@ -122,6 +122,12 @@ public class LocalDbService
             .FirstOrDefaultAsync();
 
         return script;
+    }
+
+    public async Task<TourLocation> GetTourLocationByServerId(string serverId)
+    {
+        await Init();
+        return await _db.Table<TourLocation>().Where(t => t.ServerId == serverId).FirstOrDefaultAsync();
     }
 
     public async Task<List<TourLocation>> GetAllTourLocations()
