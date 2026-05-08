@@ -58,24 +58,53 @@ public partial class QRScannerPage : ContentPage
 
         Dispatcher.DispatchAsync(async () =>
         {
-            // Tắt camera ngay lập tức khi bắt được mã
             CameraReader.IsDetecting = false;
+            var lm = LocalizationManager.Instance;
 
-            // KIỂM TRA MÃ QR
-            if (result.Value == "8E8F1796A99745F4")
+            // Gọi API xác thực mã QR vé
+            var apiService = IPlatformApplication.Current?.Services.GetService<Services.ApiService>();
+            Services.QrVerifyData verifyData = null;
+
+            if (apiService != null)
+            {
+                verifyData = await apiService.VerifyQrCodeAsync(result.Value);
+            }
+
+            if (verifyData?.IsValid == true)
             {
                 Preferences.Default.Set("IsAppUnlocked", true);
 
-                var lm = LocalizationManager.Instance;
-                await DisplayAlert(lm.SuccessTitle, lm.TicketSuccessMessage, lm.TicketSuccessButton);
+                string msg = lm.TicketSuccessMessage;
+                if (verifyData.ExpiryAt.HasValue)
+                {
+                    string expiry = verifyData.ExpiryAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+                    msg += $"\nHết hạn: {expiry}";
+                }
 
+                await DisplayAlert(lm.SuccessTitle, msg, lm.TicketSuccessButton);
                 Application.Current.MainPage = new AppShell();
+            }
+            else if (verifyData != null && !verifyData.IsValid)
+            {
+                // Mã không hợp lệ theo Server
+                string reason = string.IsNullOrEmpty(verifyData.Message) ? lm.TicketInvalidMessage : verifyData.Message;
+                await DisplayAlert(lm.ErrorTitle, reason, lm.ScanAgainButton);
+                CameraReader.IsDetecting = true;
             }
             else
             {
-                var lm = LocalizationManager.Instance;
-                await DisplayAlert(lm.ErrorTitle, lm.TicketInvalidMessage, lm.ScanAgainButton);
-                CameraReader.IsDetecting = true;
+                // Offline hoặc lỗi mạng — fallback kiểm tra cục bộ
+                if (result.Value == "8E8F1796A99745F4")
+                {
+                    Preferences.Default.Set("IsAppUnlocked", true);
+                    await DisplayAlert(lm.SuccessTitle, lm.TicketSuccessMessage, lm.TicketSuccessButton);
+                    Application.Current.MainPage = new AppShell();
+                }
+                else
+                {
+                    await DisplayAlert(lm.ErrorTitle, lm.TicketInvalidMessage, lm.ScanAgainButton);
+                    CameraReader.IsDetecting = true;
+                }
             }
         });
     }
