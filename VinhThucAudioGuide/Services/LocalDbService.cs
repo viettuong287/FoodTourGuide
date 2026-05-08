@@ -24,7 +24,7 @@ public class LocalDbService
         await _db.CreateTableAsync<UserDevice>();
 
         // await SeedData(); // Tắt dữ liệu mẫu để chỉ hiển thị dữ liệu thực tế từ Web CMS
-    }
+    }gi
 
     public async Task ClearAllDataAsync()
     {
