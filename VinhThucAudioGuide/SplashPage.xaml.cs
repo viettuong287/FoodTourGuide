@@ -18,6 +18,9 @@ public partial class SplashPage : ContentPage
         {
             if (localDb != null && apiService != null)
             {
+                // Lưu lại BaseUrl để các thành phần khác sử dụng (như TTS)
+                Preferences.Default.Set("RemoteApiBase", "https://locateandmultilingualnarration-amgrfua6fbd7gnce.eastasia-01.azurewebsites.net/api/");
+
                 // 1. Kiểm tra lệnh Reset từ Admin
                 bool needsReset = await apiService.CheckResetFlagAsync();
                 if (needsReset)

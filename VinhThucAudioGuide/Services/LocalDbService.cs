@@ -23,7 +23,7 @@ public class LocalDbService
         await _db.CreateTableAsync<QRCodeData>();
         await _db.CreateTableAsync<UserDevice>();
 
-        await SeedData(); // Mở lại dữ liệu mẫu để App có nội dung ngay lập tức
+        // await SeedData(); // Tắt dữ liệu mẫu để chỉ hiển thị dữ liệu thực tế từ Web CMS
     }
 
     public async Task ClearAllDataAsync()
@@ -70,7 +70,7 @@ public class LocalDbService
             var loc = await _db.Table<TourLocation>().Where(t => t.LocationName == name).FirstOrDefaultAsync();
             if (loc == null)
             {
-                loc = new TourLocation { LocationName = name, Category = cat, ImageUrl = img, Latitude = lat, Longitude = lon };
+                loc = new TourLocation { LocationName = name, Address = cat, ImageUrl = img, Latitude = lat, Longitude = lon };
                 await _db.InsertAsync(loc);
 
                 string qrCode = "QR_" + name.Replace(" ", "").ToUpper();
@@ -158,7 +158,7 @@ public class LocalDbService
                 if (existing.ImageUrl != r.ImageUrl) { existing.ImageUrl = r.ImageUrl; dirty = true; }
                 if (existing.Latitude != r.Latitude) { existing.Latitude = r.Latitude; dirty = true; }
                 if (existing.Longitude != r.Longitude) { existing.Longitude = r.Longitude; dirty = true; }
-                if (existing.Category != r.Category) { existing.Category = r.Category; dirty = true; }
+                if (existing.Address != r.Address) { existing.Address = r.Address; dirty = true; }
                 if (dirty) await _db.UpdateAsync(existing);
             }
         }
@@ -210,7 +210,7 @@ public class LocalDbService
                 {
                     ServerId = locData.ServerId,
                     LocationName = locData.Name,
-                    Category = locData.Category,
+                    Address = locData.Address,
                     ImageUrl = locData.ImageUrl,
                     Latitude = locData.Latitude,
                     Longitude = locData.Longitude,
@@ -227,7 +227,7 @@ public class LocalDbService
                 // Cập nhật toàn bộ thông tin mới nhất
                 existing.ServerId = locData.ServerId;
                 existing.LocationName = locData.Name;
-                existing.Category = locData.Category;
+                existing.Address = locData.Address;
                 existing.ImageUrl = locData.ImageUrl;
                 existing.Latitude = locData.Latitude;
                 existing.Longitude = locData.Longitude;

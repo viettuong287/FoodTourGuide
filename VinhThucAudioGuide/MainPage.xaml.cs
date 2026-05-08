@@ -26,9 +26,9 @@ namespace VinhThucAudioGuide
     public class POI
     {
         public int Id { get; set; }
+        public string ServerId { get; set; }
         public string Name { get; set; }
-        public string Category { get; set; }
-        public string DisplayCategory { get; set; }
+        public string Address { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public string ImageUrl { get; set; }
@@ -84,23 +84,11 @@ namespace VinhThucAudioGuide
             var lm = LocalizationManager.Instance;
             Title = lm.MapTitle;
             btnGps.Text = lm.GpsButton;
-            BtnFoodCategory.Text = lm.FoodCategory;
-            BtnFunCategory.Text = lm.FunCategory;
-            BtnFestivalCategory.Text = lm.FestivalCategory;
             BtnListen.Text = lm.ListenButton;
             BtnStop.Text = lm.StopButton;
-            RefreshLocalizedPoiCategories();
             ApplyCategoryFilter();
         }
 
-        private void RefreshLocalizedPoiCategories()
-        {
-            var lm = LocalizationManager.Instance;
-            foreach (var poi in _allPois)
-            {
-                poi.DisplayCategory = lm.LocalizeCategory(poi.Category ?? string.Empty);
-            }
-        }
 
         private void InitMap()
         {
@@ -131,9 +119,9 @@ namespace VinhThucAudioGuide
                 var poiMoi = new POI
                 {
                     Id = loc.Id,
+                    ServerId = loc.ServerId, // Lưu ServerId
                     Name = loc.LocationName,
-                    Category = loc.Category,
-                    DisplayCategory = LocalizationManager.Instance.LocalizeCategory(loc.Category ?? string.Empty),
+                    Address = loc.Address,
                     ImageUrl = loc.ImageUrl,
                     Latitude = loc.Latitude,
                     Longitude = loc.Longitude
@@ -214,28 +202,11 @@ namespace VinhThucAudioGuide
             GetLocationAndCenter();
         }
 
-        private void Category_Clicked(object sender, EventArgs e)
-        {
-            var btn = sender as Button;
-            if (btn == BtnFoodCategory) _activeCategoryFilter = "Thức ăn";
-            else if (btn == BtnFunCategory) _activeCategoryFilter = "Vui chơi";
-            else if (btn == BtnFestivalCategory) _activeCategoryFilter = "Lễ hội";
-            else _activeCategoryFilter = string.Empty;
-
-            ApplyCategoryFilter();
-        }
 
         private void ApplyCategoryFilter()
         {
-            if (string.IsNullOrEmpty(_activeCategoryFilter))
-            {
-                cvPoiList.ItemsSource = _allPois.ToList();
-                return;
-            }
-
-            cvPoiList.ItemsSource = _allPois
-                .Where(p => (p.Category ?? string.Empty) == _activeCategoryFilter)
-                .ToList();
+            // Bây giờ không lọc category nữa, chỉ hiện tất cả các món Active
+            cvPoiList.ItemsSource = _allPois.ToList();
         }
 
         private async void Poi_Selected(object sender, SelectionChangedEventArgs e)
@@ -320,97 +291,93 @@ namespace VinhThucAudioGuide
             }
 
             var selectedPoi = _selectedPoiForAudio;
+            var db = new Services.LocalDbService();
+            var allLangs = await db.GetAllLanguages();
 
-            // Hiển thị 5 ngôn ngữ chuẩn: Việt, Anh, Pháp, Trung, Hàn
-            var lm = LocalizationManager.Instance;
-            string action = await DisplayActionSheet(lm.LanguageActionSheetTitle, lm.CancelButton, null,
-                "🇻🇳 Tiếng Việt",
-                "🇬🇧 English",
-                "🇫🇷 Français",
-                "🇨🇳 中文",
-                "🇰🇷 한국어");
-            if (action == lm.CancelButton || string.IsNullOrEmpty(action)) return;
+            if (allLangs == null || allLangs.Count == 0)
+            {
+                await DisplayAlert("Thông báo", "Chưa có dữ liệu ngôn ngữ thuyết minh. Vui lòng kiểm tra kết nối!", "OK");
+                return;
+            }
 
-            string text = "", lang = "vi";
-            if (action.Contains("Việt")) { text = selectedPoi.AudioScripts.GetValueOrDefault("vi", selectedPoi.Name); lang = "vi"; }
-            else if (action.Contains("English")) { text = selectedPoi.AudioScripts.GetValueOrDefault("en", selectedPoi.Name); lang = "en"; }
-            else if (action.Contains("Français")) { text = selectedPoi.AudioScripts.GetValueOrDefault("fr", selectedPoi.Name); lang = "fr"; }
-            else if (action.Contains("中文")) { text = selectedPoi.AudioScripts.GetValueOrDefault("zh", selectedPoi.Name); lang = "zh"; }
-            else if (action.Contains("한국어")) { text = selectedPoi.AudioScripts.GetValueOrDefault("ko", selectedPoi.Name); lang = "ko"; }
+            // Hiển thị danh sách ngôn ngữ từ DB
+            string[] langNames = allLangs.Select(l => l.LangName).ToArray();
+            string action = await DisplayActionSheet("Chọn ngôn ngữ thuyết minh", "Hủy", null, langNames);
+            
+            if (action == "Hủy" || string.IsNullOrEmpty(action)) return;
+
+            var selectedLang = allLangs.FirstOrDefault(l => l.LangName == action);
+            if (selectedLang == null) return;
+
+            string lang = selectedLang.LangCode;
+            string text = selectedPoi.AudioScripts.GetValueOrDefault(lang, selectedPoi.Name);
+
+            // Bước 3: Chọn Giọng đọc (Lấy từ Server)
+            var apiService = IPlatformApplication.Current?.Services.GetService<Services.ApiService>();
+            var voices = await apiService.GetVoicesAsync(selectedLang.ServerId);
+            Guid? selectedVoiceId = null;
+
+            if (voices != null && voices.Count > 0)
+            {
+                string[] voiceNames = voices.Select(v => v.DisplayName).ToArray();
+                string voiceAction = await DisplayActionSheet("Chọn giọng đọc", "Hủy", null, voiceNames);
+                if (voiceAction != "Hủy" && !string.IsNullOrEmpty(voiceAction))
+                {
+                    selectedVoiceId = voices.FirstOrDefault(v => v.DisplayName == voiceAction)?.Id;
+                }
+            }
 
             _speechId++;
             int currentId = _speechId;
             _currentAudioPlayer?.Stop();
-
-         
-            var finalSentences = new List<string>();
-            var rawParts = text.Split(new[] { '.', '\n', '?', '!' }, StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var part in rawParts)
-            {
-                var words = part.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
-                string chunk = "";
-                foreach (var word in words)
-                {
-                    
-                    if (chunk.Length + word.Length > 150)
-                    {
-                        finalSentences.Add(chunk.Trim());
-                        chunk = "";
-                    }
-                    chunk += word + " ";
-                }
-                if (!string.IsNullOrWhiteSpace(chunk)) finalSentences.Add(chunk.Trim());
-            }
 
             try
             {
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
-                // Try to fetch cached cloud TTS file for this POI
-                string cachedPath = await Services.AudioCacheService.GetOrFetchAudioAsync(_selectedPoiForAudio.Id, lang);
-                if (!string.IsNullOrEmpty(cachedPath) && File.Exists(cachedPath))
+                // Gọi API TTS của Server với VoiceId đã chọn
+                string apiBase = Preferences.Default.Get("RemoteApiBase", string.Empty);
+                if (!string.IsNullOrWhiteSpace(apiBase))
                 {
-                    // Play cached file
+                    string ttsUrl = apiBase.TrimEnd('/') + $"/api/mobile/tts?stallId={selectedPoi.ServerId}&lang={lang}";
+                    if (selectedVoiceId.HasValue) ttsUrl += $"&voiceId={selectedVoiceId.Value}";
+
                     _currentAudioPlayer?.Stop();
-                    _currentAudioPlayer = AudioManager.Current.CreatePlayer(cachedPath);
+                    _currentAudioPlayer = AudioManager.Current.CreatePlayer(ttsUrl);
                     _currentAudioPlayer.Play();
                     return;
                 }
 
-                // If no cached file, try to stream/generate per-sentence and cache whole file when possible
+                // Fallback nếu không có Server API (Dùng Google TTS cũ)
+                var finalSentences = new List<string>();
+                var rawParts = text.Split(new[] { '.', '\n', '?', '!' }, StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var part in rawParts)
+                {
+                    var words = part.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    string chunk = "";
+                    foreach (var word in words)
+                    {
+                        if (chunk.Length + word.Length > 150)
+                        {
+                            finalSentences.Add(chunk.Trim());
+                            chunk = "";
+                        }
+                        chunk += word + " ";
+                    }
+                    if (!string.IsNullOrWhiteSpace(chunk)) finalSentences.Add(chunk.Trim());
+                }
+
                 foreach (var sentence in finalSentences)
                 {
                     if (currentId != _speechId) break;
-
                     string cleanSentence = sentence.Trim();
                     if (string.IsNullOrEmpty(cleanSentence)) continue;
 
-                    // Try to download full TTS for single sentence from cloud (server may support chunking)
-                    string ttsUrl = Preferences.Default.Get("RemoteApiBase", string.Empty);
-                    byte[] audioBytes = null;
-                    if (!string.IsNullOrWhiteSpace(ttsUrl))
-                    {
-                        try
-                        {
-                            var api = ttsUrl.TrimEnd('/') + $"/api/mobile/tts?locationId={_selectedPoiForAudio.Id}&lang={lang}&text=" + Uri.EscapeDataString(cleanSentence);
-                            var resp = await client.GetAsync(api);
-                            if (resp.IsSuccessStatusCode)
-                            {
-                                audioBytes = await resp.Content.ReadAsByteArrayAsync();
-                            }
-                        }
-                        catch { audioBytes = null; }
-                    }
-
-                    // Fallback to Google TTS (not ideal for production, but works)
-                    if (audioBytes == null || audioBytes.Length == 0)
-                    {
-                        var url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(cleanSentence)}&tl={lang}&client=tw-ob";
-                        audioBytes = await client.GetByteArrayAsync(url);
-                    }
-
+                    var url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(cleanSentence)}&tl={lang}&client=tw-ob";
+                    var audioBytes = await client.GetByteArrayAsync(url);
+                    
                     if (currentId != _speechId) break;
 
                     _currentAudioPlayer?.Stop();
@@ -428,8 +395,8 @@ namespace VinhThucAudioGuide
                 // After successful stream, try to fetch and cache full audio for POI (best-effort)
                 try
                 {
-                    var apiBase = Preferences.Default.Get("RemoteApiBase", string.Empty);
-                    if (!string.IsNullOrWhiteSpace(apiBase))
+                    var apiBaseUrl = Preferences.Default.Get("RemoteApiBase", string.Empty);
+                    if (!string.IsNullOrWhiteSpace(apiBaseUrl))
                     {
                         var cachePath = await Services.AudioCacheService.GetOrFetchAudioAsync(_selectedPoiForAudio.Id, lang);
                         // ignore result; cache method already writes file

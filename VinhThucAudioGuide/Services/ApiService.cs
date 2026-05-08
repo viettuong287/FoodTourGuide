@@ -41,7 +41,13 @@ public class ApiService
             var response = await _httpClient.GetAsync(url);
             if (response.IsSuccessStatusCode)
             {
-                return await response.Content.ReadFromJsonAsync<SyncDataResponse>();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                return await response.Content.ReadFromJsonAsync<SyncDataResponse>(options);
+            }
+            else
+            {
+                // Báo lỗi ra Console để lập trình viên biết (404, 500, v.v...)
+                Console.WriteLine($"API Sync Failed: {response.StatusCode} at {url}");
             }
         }
         catch (Exception ex)
@@ -147,6 +153,23 @@ public class ApiService
         return false;
     }
 
+    public async Task<List<SyncVoiceProfile>> GetVoicesAsync(string languageId)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return new();
+
+            var response = await _httpClient.GetAsync($"tts-voice-profiles/active?languageId={languageId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResult<List<SyncVoiceProfile>>>();
+                return result?.Data ?? new();
+            }
+        }
+        catch { }
+        return new();
+    }
+
     private string GetOrCreateDeviceId()
     {
         var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
@@ -177,12 +200,19 @@ public class SyncLocation
 {
     public string ServerId { get; set; }
     public string Name { get; set; }
-    public string Category { get; set; }
+    public string Address { get; set; }
     public string Description { get; set; }
     public string ImageUrl { get; set; }
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public bool IsActive { get; set; }
+}
+
+public class SyncVoiceProfile
+{
+    public Guid Id { get; set; }
+    public string DisplayName { get; set; }
+    public bool IsDefault { get; set; }
 }
 
 public class SyncLanguage

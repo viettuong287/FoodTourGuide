@@ -29,14 +29,10 @@
                     Clicked="MyLocation_Clicked" />
         </Grid>
 
-        <!-- 3. BỘ LỌC DANH MỤC -->
-        <HorizontalStackLayout Grid.Row="2" HorizontalOptions="Center" Spacing="15" Margin="0,15,0,10">
-            <Button x:Name="BtnFoodCategory" Text="🍴 Thức ăn" BackgroundColor="#d4a017" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
-            <Button x:Name="BtnFunCategory" Text="🏛️ Vui chơi" BackgroundColor="#1565c0" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
-            <Button x:Name="BtnFestivalCategory" Text="🎉 Lễ hội" BackgroundColor="#6a1b9a" TextColor="White" CornerRadius="20" HeightRequest="40" Clicked="Category_Clicked"/>
-        </HorizontalStackLayout>
+        <!-- 3. TIÊU ĐỀ DANH SÁCH -->
+        <Label Grid.Row="2" Text="🍴 Danh sách món ăn" FontAttributes="Bold" FontSize="18" Margin="15,10,0,5" TextColor="White"/>
 
-        <!-- 4. DANH SÁCH ĐỊA ĐIỂM (Đã dùng Border thay Frame & Chống liệt cảm ứng) -->
+        <!-- 4. DANH SÁCH ĐỊA ĐIỂM -->
         <CollectionView x:Name="cvPoiList" 
                         Grid.Row="3" 
                         SelectionMode="Single" 
@@ -44,32 +40,25 @@
                         Margin="15,0">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <!-- Đổi sang Border để chuẩn MAUI mới -->
-                    <Border Padding="10" Margin="0,0,0,10" BackgroundColor="#E8E8E8" Stroke="Transparent">
+                    <Border Padding="10" Margin="0,0,0,10" BackgroundColor="White" Stroke="#E0E0E0">
                         <Border.StrokeShape>
                             <RoundRectangle CornerRadius="12" />
                         </Border.StrokeShape>
                         
-
-                        <!-- Ảnh thu gọn thành ô vuông, cố định kích thước để không bị kéo giãn -->
-                        <Grid ColumnDefinitions="90, *">
-
-                            <Border Grid.RowSpan="2" Grid.Column="0" WidthRequest="72" HeightRequest="72" BackgroundColor="#CCCCCC" Padding="0">
+                        <Grid ColumnDefinitions="80, *">
+                            <Border Grid.Column="0" WidthRequest="70" HeightRequest="70" BackgroundColor="#F5F5F5" Padding="0">
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="8" />
                                 </Border.StrokeShape>
-                                <Image Source="{Binding ImageUrl}" Aspect="AspectFill" VerticalOptions="Center" HorizontalOptions="Center"/>
+                                <Image Source="{Binding ImageUrl}" Aspect="AspectFill"/>
                             </Border>
 
-                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4" Margin="15,0,0,0">
-                                <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="16" TextColor="#333333"/>
-                                <HorizontalStackLayout Spacing="5">
-                                    <Label Text="⭐" FontSize="12"/>
-                                    <Label Text="{Binding Rating}" FontSize="13" TextColor="#d4a017" FontAttributes="Bold"/>
-                                    <Label Text="•" FontSize="13" TextColor="#777777"/>
-                                    <Label Text="{Binding DisplayCategory}" FontSize="13" TextColor="#777777"/>
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2" Margin="12,0,0,0">
+                                <Label Text="{Binding LocationName}" FontAttributes="Bold" FontSize="15" TextColor="#333333"/>
+                                <Label Text="{Binding Address}" FontSize="12" TextColor="#777777" LineBreakMode="WordWrap" MaxLines="2"/>
+                                <HorizontalStackLayout Spacing="5" Margin="0,4,0,0">
+                                    <Label Text="🟢 Active" FontSize="11" TextColor="#2e7d32" FontAttributes="Bold"/>
                                 </HorizontalStackLayout>
-                                <Label Text="{Binding Source={x:Static local:LocalizationManager.Instance}, Path=TapToViewRoute}" FontSize="12" TextColor="#1976D2" FontAttributes="Italic"/>
                             </VerticalStackLayout>
                         </Grid>
                     </Border>
