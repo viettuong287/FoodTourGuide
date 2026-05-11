@@ -11,6 +11,7 @@ namespace Web.Models
         public int TotalStalls { get; set; }
         public int ActiveLanguages { get; set; }
         public int TotalNarrationContents { get; set; }
+        public int ActiveDevicesCount { get; set; }
 
         // --- Danh sách mới nhất (thật) ---
         public IReadOnlyList<BusinessDetailDto> RecentBusinesses { get; set; } = [];

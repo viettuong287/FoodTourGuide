@@ -105,6 +105,11 @@ namespace Web.Services
             session.SetString(UserPlanExpiresAtSessionKey, planExpiresAt?.ToString("O") ?? string.Empty);
         }
 
+        public string? GetToken()
+        {
+            return _httpContextAccessor.HttpContext?.Session.GetString(TokenSessionKey);
+        }
+
         public string? GetRefreshToken()
         {
             return _httpContextAccessor.HttpContext?.Session.GetString(RefreshTokenSessionKey);

@@ -82,6 +82,10 @@
     .stat-icon.stalls i { color: var(--gold); }
     .stat-icon.languages { background: rgba(58,125,79,0.12); }
     .stat-icon.languages i { color: #3a7d4f; }
+    .stat-icon.online { background: rgba(58,125,79,0.12); position: relative; }
+    .stat-icon.online i { color: #3a7d4f; }
+    .stat-icon.online .pulse-dot { position: absolute; top: 0; right: 0; width: 10px; height: 10px; background: #3a7d4f; border-radius: 50%; border: 2px solid var(--ivory); animation: pulse-small 1.5s infinite; }
+    @@keyframes pulse-small { 0% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(0.8); opacity: 0.5; } }
     .stat-icon.narrations { background: rgba(107,76,154,0.12); }
     .stat-icon.narrations i { color: #6b4c9a; }
     .stat-number { font-size: 2.2rem; font-weight: 700; color: var(--text-dark); line-height: 1; margin-bottom: 6px; }
@@ -258,6 +262,17 @@
         <div class="stat-label">Nội dung thuyết minh</div>
         <a asp-controller="Narration" asp-action="StallNarrationContents" class="stat-link">
             Xem tất cả <i class="bi bi-arrow-right"></i>
+        </a>
+    </div>
+    <div class="stat-card online">
+        <div class="stat-icon online">
+            <i class="bi bi-broadcast"></i>
+            <span class="pulse-dot" style="animation: pulse-small 1.5s infinite;"></span>
+        </div>
+        <div class="stat-number" id="online-device-count">@Model.ActiveDevicesCount</div>
+        <div class="stat-label">Thiết bị Online</div>
+        <a asp-controller="Admin" asp-action="ActiveDevices" class="stat-link">
+            Xem chi tiết <i class="bi bi-arrow-right"></i>
         </a>
     </div>
 </div>
@@ -668,6 +683,26 @@
     }
 
     // Tự động load khi trang mở
-    document.addEventListener('DOMContentLoaded', loadRecentOrders);
+    document.addEventListener('DOMContentLoaded', () => {
+        loadRecentOrders();
+        startOnlineCountPoller();
+    });
+
+    function startOnlineCountPoller() {
+        setInterval(async () => {
+            try {
+                const token = localStorage.getItem('jwtToken');
+                const res = await fetch(`${API_BASE}/api/geo/active-devices?withinSeconds=30`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const json = await res.json();
+                    const count = json?.data?.activeCount ?? 0;
+                    const el = document.getElementById('online-device-count');
+                    if (el) el.textContent = count;
+                }
+            } catch (e) { console.error("Lỗi cập nhật số lượng online:", e); }
+        }, 5000); // Cập nhật mỗi 5 giây
+    }
 </script>
 }

@@ -9,6 +9,7 @@ namespace Web.Controllers
 {
     public class AdminController : Controller
     {
+        private readonly ApiClient _apiClient;
         private readonly BusinessApiClient _businessApiClient;
         private readonly StallApiClient _stallApiClient;
         private readonly LanguageApiClient _languageApiClient;
@@ -20,6 +21,7 @@ namespace Web.Controllers
         private readonly GeoApiClient _geoApiClient;
 
         public AdminController(
+            ApiClient apiClient,
             BusinessApiClient businessApiClient,
             StallApiClient stallApiClient,
             LanguageApiClient languageApiClient,
@@ -30,6 +32,7 @@ namespace Web.Controllers
             QrCodeApiClient qrCodeApiClient,
             GeoApiClient geoApiClient)
         {
+            _apiClient = apiClient;
             _businessApiClient = businessApiClient;
             _stallApiClient = stallApiClient;
             _languageApiClient = languageApiClient;
@@ -62,11 +65,13 @@ namespace Web.Controllers
                 TotalStalls = stalls?.Data?.TotalCount ?? 0,
                 ActiveLanguages = languages?.Data?.Count ?? 0,
                 TotalNarrationContents = narrations?.Data?.TotalCount ?? 0,
+                ActiveDevicesCount = (await _geoApiClient.GetActiveDevicesAsync(30, cancellationToken))?.Data?.ActiveCount ?? 0,
                 RecentBusinesses = businesses?.Data?.Items?.ToList() ?? [],
                 RecentStalls = stalls?.Data?.Items?.ToList() ?? [],
                 Languages = languages?.Data?.ToList() ?? [],
             };
 
+            ViewBag.Token = _apiClient.GetToken();
             return View(vm);
         }
 
