@@ -14,8 +14,7 @@ namespace Api.Infrastructure.Persistence
             await UserSeeder.SeedAsync(db);
             await BusinessOwnerSeeder.SeedAsync(db);         // 100 business owner mẫu
             await SubscriptionOrderSeeder.SeedAsync(db);     // orders + plan cho các business
-            // StallSeeder cũ được thay bằng FamousSaigonFoodSeeder (15 quán ăn nổi tiếng SG có thật).
-            await FamousSaigonFoodSeeder.SeedAsync(db);
+            await StallSeeder.SeedAsync(db);                 // stalls quanh phố ẩm thực (giữ lại data gốc)
         }
     }
 }

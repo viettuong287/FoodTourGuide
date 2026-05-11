@@ -73,10 +73,9 @@ namespace Api.Controllers
             if (string.IsNullOrWhiteSpace(lang))
                 return BadRequest(new { message = "lang is required" });
 
-            // 1) Resolve Language theo mã (Code). Mobile gửi "vi" / "en" / "fr" / "zh" / "ko".
-            var language = await _context.Languages
-                .AsNoTracking()
-                .FirstOrDefaultAsync(l => l.Code == lang, cancellationToken);
+            // 1) Resolve Language theo mã. Mobile có thể gửi "en-US" hoặc "en".
+            // Dùng resolver chung để chấp nhận cả mã đầy đủ và mã ngắn.
+            var language = await ResolveLanguageAsync(lang, cancellationToken);
 
             if (language == null)
             {
@@ -84,41 +83,54 @@ namespace Api.Controllers
                 return NotFound(new { message = "Language not found" });
             }
 
-            // 2) Tìm narration content cho stall + language.
-            //    Ưu tiên bản đang Active, sau đó tới bản cập nhật gần nhất.
-            var content = await _context.StallNarrationContents
+            // 2) Lấy tất cả narration content active của stall để có thể tìm audio đúng ngôn ngữ.
+            //    Web thường lưu nhiều audio ngoại ngữ dưới cùng một content gốc, nên không được
+            //    chỉ nhìn vào content có LanguageId trùng ngôn ngữ đang chọn.
+            var contents = await _context.StallNarrationContents
                 .AsNoTracking()
                 .Include(c => c.NarrationAudios)
-                .Where(c => c.StallId == stallId && c.LanguageId == language.Id)
+                    .ThenInclude(a => a.TtsVoiceProfile)
+                .Where(c => c.StallId == stallId && c.IsActive)
                 .OrderByDescending(c => c.IsActive)
                 .ThenByDescending(c => c.UpdatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
+                .ToListAsync(cancellationToken);
 
-            if (content == null)
+            if (contents.Count == 0)
             {
                 _logger.LogInformation("Narration: chưa có content cho StallId {StallId}, Lang {Lang}", stallId, lang);
                 return NotFound(new { message = "Narration content not found" });
             }
 
+            var content = contents.FirstOrDefault(c => c.LanguageId == language.Id) ?? contents[0];
+
             // 3) Chọn audio theo thứ tự ưu tiên:
             //    - Khớp voiceId người dùng chọn (nếu có)
-            //    - Bản TTS (IsTts = true)
-            //    - Bất kỳ audio nào có URL hợp lệ
-            var audios = content.NarrationAudios
-                .Where(a => !string.IsNullOrWhiteSpace(a.AudioUrl))
-                .ToList();
+            //    - Bản TTS thuộc đúng ngôn ngữ người dùng chọn
+            //    - Bất kỳ audio nào thuộc đúng ngôn ngữ người dùng chọn
+            // Không fallback bừa sang audio ngôn ngữ khác để tránh chọn English nhưng phát tiếng Việt.
+            var selected = SelectAudioForLanguage(content.NarrationAudios, language.Id, voiceId, content.LanguageId == language.Id);
 
-            NarrationAudio? selected = null;
-            if (voiceId.HasValue)
-                selected = audios.FirstOrDefault(a => a.TtsVoiceProfileId == voiceId.Value);
-            selected ??= audios.FirstOrDefault(a => a.IsTts);
-            selected ??= audios.FirstOrDefault();
+            // Nếu content ưu tiên không có audio URL ngoại ngữ, quét các content khác của cùng stall.
+            // Trường hợp này đúng với màn web đang gom nhiều audio theo ngôn ngữ trong một content.
+            if (selected == null)
+            {
+                foreach (var candidate in contents.Where(c => c.Id != content.Id))
+                {
+                    selected = SelectAudioForLanguage(candidate.NarrationAudios, language.Id, voiceId, candidate.LanguageId == language.Id);
+                    if (selected != null)
+                    {
+                        content = candidate;
+                        break;
+                    }
+                }
+            }
 
             return Ok(new
             {
                 NarrationContentId = content.Id,
                 StallId = content.StallId,
-                LanguageId = content.LanguageId,
+                LanguageId = language.Id,
+                SourceLanguageId = content.LanguageId,
                 LanguageCode = language.Code,
                 Title = content.Title,
                 Description = content.Description,
@@ -156,8 +168,7 @@ namespace Api.Controllers
             }
             else if (stallId.HasValue && !string.IsNullOrWhiteSpace(lang))
             {
-                var language = await _context.Languages
-                    .FirstOrDefaultAsync(l => l.Code == lang, cancellationToken);
+                var language = await ResolveLanguageAsync(lang, cancellationToken);
                 if (language == null)
                     return NotFound(new { message = "Language not found" });
 
@@ -167,19 +178,35 @@ namespace Api.Controllers
                     .OrderByDescending(s => s.IsActive)
                     .ThenByDescending(s => s.UpdatedAt)
                     .FirstOrDefaultAsync(cancellationToken);
+
+                // Nếu không có content đúng ngôn ngữ, dùng content gốc của stall để sinh/chọn audio.
+                // Audio đa ngôn ngữ được phân biệt bằng TtsVoiceProfile.LanguageId chứ không phải LanguageId của content.
+                content ??= await _context.StallNarrationContents
+                    .Include(s => s.Language)
+                    .Where(s => s.StallId == stallId.Value)
+                    .OrderByDescending(s => s.IsActive)
+                    .ThenByDescending(s => s.UpdatedAt)
+                    .FirstOrDefaultAsync(cancellationToken);
             }
 
             if (content == null)
                 return NotFound(new { message = "Narration content not found" });
 
             // Bước 2: Tìm audio TTS đã có (ưu tiên đúng voice nếu được chọn)
+            var requestedLanguage = !string.IsNullOrWhiteSpace(lang)
+                ? await ResolveLanguageAsync(lang, cancellationToken)
+                : null;
+
             var audioQuery = _context.NarrationAudios
+                .Include(a => a.TtsVoiceProfile)
                 .Where(a => a.NarrationContentId == content.Id
                             && a.IsTts
                             && !string.IsNullOrEmpty(a.BlobId));
 
             if (voiceId.HasValue)
                 audioQuery = audioQuery.Where(a => a.TtsVoiceProfileId == voiceId.Value);
+            else if (requestedLanguage != null)
+                audioQuery = audioQuery.Where(a => a.TtsVoiceProfile != null && a.TtsVoiceProfile.LanguageId == requestedLanguage.Id);
 
             var audio = await audioQuery
                 .OrderByDescending(a => a.UpdatedAt)
@@ -200,6 +227,20 @@ namespace Api.Controllers
                 audio = voiceId.HasValue
                     ? results.FirstOrDefault(a => a.TtsVoiceProfileId == voiceId.Value && !string.IsNullOrEmpty(a.BlobId))
                     : null;
+
+                if (audio == null && requestedLanguage != null)
+                {
+                    var profileIds = await _context.TtsVoiceProfiles
+                        .Where(v => v.LanguageId == requestedLanguage.Id)
+                        .Select(v => v.Id)
+                        .ToListAsync(cancellationToken);
+
+                    audio = results.FirstOrDefault(a =>
+                        a.TtsVoiceProfileId.HasValue
+                        && profileIds.Contains(a.TtsVoiceProfileId.Value)
+                        && !string.IsNullOrEmpty(a.BlobId));
+                }
+
                 audio ??= results.FirstOrDefault(a => !string.IsNullOrEmpty(a.BlobId));
             }
 
@@ -219,6 +260,48 @@ namespace Api.Controllers
 
             var dl = await blobClient.DownloadAsync(cancellationToken);
             return File(dl.Value.Content, dl.Value.Details.ContentType ?? "audio/mpeg");
+        }
+
+        private async Task<Language?> ResolveLanguageAsync(string? lang, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(lang)) return null;
+
+            var normalized = lang.Trim();
+            var shortCode = normalized.Split('-')[0];
+
+            return await _context.Languages
+                .FirstOrDefaultAsync(l =>
+                    l.Code == normalized
+                    || l.Code == shortCode
+                    || l.Code.StartsWith(shortCode + "-"), cancellationToken);
+        }
+
+        private static NarrationAudio? SelectAudioForLanguage(
+            IEnumerable<NarrationAudio>? audios,
+            Guid languageId,
+            Guid? voiceId,
+            bool allowLegacyAudio)
+        {
+            var list = audios?
+                .Where(a => !string.IsNullOrWhiteSpace(a.AudioUrl))
+                .OrderByDescending(a => a.UpdatedAt)
+                .ToList() ?? [];
+
+            if (list.Count == 0) return null;
+
+            NarrationAudio? selected = null;
+            if (voiceId.HasValue)
+                selected = list.FirstOrDefault(a => a.TtsVoiceProfileId == voiceId.Value);
+
+            selected ??= list.FirstOrDefault(a => a.IsTts && a.TtsVoiceProfile?.LanguageId == languageId)
+                ?? list.FirstOrDefault(a => a.TtsVoiceProfile?.LanguageId == languageId);
+
+            // Chỉ cho dùng audio legacy không gắn voice profile khi content thật sự thuộc ngôn ngữ đó.
+            // Nhờ vậy chọn English/French sẽ không phát nhầm file tiếng Việt.
+            if (selected == null && allowLegacyAudio)
+                selected = list.FirstOrDefault(a => a.TtsVoiceProfileId == null);
+
+            return selected;
         }
     }
 }
