@@ -172,10 +172,17 @@ public class LocalDbService
         return added;
     }
 
-    public async Task SyncWithServerAsync(ApiService apiService)
+    /// <summary>
+    /// Đồng bộ dữ liệu từ server xuống local SQLite.
+    /// Tham số progress (tuỳ chọn) dùng để báo cáo tiến độ cho UI SplashPage.
+    /// Giá trị Percent nằm trong [0, 1] thể hiện tiến độ của riêng quá trình sync này.
+    /// </summary>
+    public async Task SyncWithServerAsync(ApiService apiService, IProgress<(double Percent, string Status)>? progress = null)
     {
         await Init();
-        
+
+        progress?.Report((0.05, "Đang tải dữ liệu từ máy chủ..."));
+
         // Lấy thời gian đồng bộ thành công gần nhất
         var lastSyncStr = Preferences.Get("LastSyncTime", string.Empty);
         DateTimeOffset? lastSync = null;
@@ -185,7 +192,14 @@ public class LocalDbService
         }
 
         var data = await apiService.GetSyncDataAsync(lastSync);
-        if (data == null) return; // Offline hoặc lỗi, dùng dữ liệu cũ
+        if (data == null)
+        {
+            // Offline hoặc lỗi → coi như đã xong, dùng dữ liệu cũ
+            progress?.Report((1.0, "Sử dụng dữ liệu đã lưu"));
+            return;
+        }
+
+        progress?.Report((0.20, $"Đang đồng bộ {data.Languages.Count} ngôn ngữ..."));
 
         // 1. Sync Languages - bao gồm FlagCode để mobile hiển thị cờ quốc gia
         // khi user chọn ngôn ngữ thuyết minh trên MainPage.
@@ -212,7 +226,11 @@ public class LocalDbService
             }
         }
 
+        progress?.Report((0.40, $"Đang đồng bộ {data.Locations.Count} POI..."));
+
         // 2. Sync Locations
+        int locIndex = 0;
+        int locTotal = Math.Max(1, data.Locations.Count);
         foreach (var locData in data.Locations)
         {
             var existing = await _db.Table<TourLocation>().Where(t => t.ServerId == locData.ServerId || t.LocationName == locData.Name).FirstOrDefaultAsync();
@@ -249,9 +267,19 @@ public class LocalDbService
                 existing.IsActive = locData.IsActive;
                 await _db.UpdateAsync(existing);
             }
+
+            // Báo cáo tiến độ cho từng location đã xử lý.
+            // Map vùng [0.40, 0.70] cho phase Locations.
+            locIndex++;
+            var locPct = 0.40 + 0.30 * ((double)locIndex / locTotal);
+            progress?.Report((locPct, $"Đang nạp POI {locIndex}/{locTotal}..."));
         }
 
+        progress?.Report((0.70, $"Đang đồng bộ {data.Scripts.Count} kịch bản..."));
+
         // 3. Sync Scripts
+        int sIndex = 0;
+        int sTotal = Math.Max(1, data.Scripts.Count);
         foreach (var scriptData in data.Scripts)
         {
             var loc = await _db.Table<TourLocation>().Where(t => t.ServerId == scriptData.LocationId).FirstOrDefaultAsync();
@@ -278,9 +306,15 @@ public class LocalDbService
                 existing.Content = scriptData.Content;
                 await _db.UpdateAsync(existing);
             }
+
+            // Báo cáo tiến độ cho mỗi script đã xử lý — map vùng [0.70, 0.95].
+            sIndex++;
+            var sPct = 0.70 + 0.25 * ((double)sIndex / sTotal);
+            progress?.Report((sPct, $"Đang nạp kịch bản {sIndex}/{sTotal}..."));
         }
 
         // Lưu lại thời gian đã đồng bộ thành công
         Preferences.Set("LastSyncTime", DateTimeOffset.UtcNow.ToString("O"));
+        progress?.Report((1.0, "Hoàn tất đồng bộ"));
     }
 }

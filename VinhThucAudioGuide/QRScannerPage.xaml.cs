@@ -72,7 +72,9 @@ public partial class QRScannerPage : ContentPage
 
             if (verifyData?.IsValid == true)
             {
+                // QR hop le -> mo khoa app + dam bao co Device ID truoc khi qua buoc chon ngon ngu.
                 Preferences.Default.Set("IsAppUnlocked", true);
+                Services.ApiService.GetOrCreateDeviceId(); // sinh va luu UniqueDeviceId neu chua co
 
                 string msg = lm.TicketSuccessMessage;
                 if (verifyData.ExpiryAt.HasValue)
@@ -82,7 +84,7 @@ public partial class QRScannerPage : ContentPage
                 }
 
                 await DisplayAlert(lm.SuccessTitle, msg, lm.TicketSuccessButton);
-                Application.Current.MainPage = new AppShell();
+                Application.Current.MainPage = BuildPostQrRoot();
             }
             else if (verifyData != null && !verifyData.IsValid)
             {
@@ -97,8 +99,9 @@ public partial class QRScannerPage : ContentPage
                 if (result.Value == "8E8F1796A99745F4")
                 {
                     Preferences.Default.Set("IsAppUnlocked", true);
+                    Services.ApiService.GetOrCreateDeviceId();
                     await DisplayAlert(lm.SuccessTitle, lm.TicketSuccessMessage, lm.TicketSuccessButton);
-                    Application.Current.MainPage = new AppShell();
+                    Application.Current.MainPage = BuildPostQrRoot();
                 }
                 else
                 {
@@ -112,5 +115,16 @@ public partial class QRScannerPage : ContentPage
     private void BtnClose_Clicked(object sender, EventArgs e)
     {
         Application.Current.Quit();
+    }
+
+    // Sau khi quet QR thanh cong: neu user da chon ngon ngu + giong roi (qua lan truoc)
+    // thi vao thang AppShell. Nguoc lai dua qua flow chon ngon ngu -> chon giong.
+    // Bao boc trong NavigationPage de co the Push tu LanguageSelectionPage sang VoiceSelectionPage.
+    private static Page BuildPostQrRoot()
+    {
+        bool hasLanguage = !string.IsNullOrEmpty(Preferences.Default.Get("pref_language_id", string.Empty));
+        if (hasLanguage)
+            return new AppShell();
+        return new NavigationPage(new LanguageSelectionPage());
     }
 }

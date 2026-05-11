@@ -5,7 +5,14 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
-        LocalizationManager.Instance.CurrentLanguage = Preferences.Default.Get("AppLang", "Tiếng Việt");
+
+        // Khôi phục ngôn ngữ UI: ưu tiên pref_language_code (đồng bộ với ngôn ngữ thuyết minh
+        // user đã chọn ở LanguageSelectionPage). Fallback "AppLang" cho tương thích cũ.
+        var prefCode = Preferences.Default.Get("pref_language_code", string.Empty);
+        if (!string.IsNullOrEmpty(prefCode))
+            LocalizationManager.Instance.SetLanguageByCode(prefCode);
+        else
+            LocalizationManager.Instance.CurrentLanguage = Preferences.Default.Get("AppLang", "Tiếng Việt");
 
         // Luôn hiển thị Splash trước, SplashPage tự xử lý điều hướng
         MainPage = new SplashPage();

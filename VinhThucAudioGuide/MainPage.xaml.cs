@@ -36,13 +36,13 @@ namespace VinhThucAudioGuide
         public double Rating { get; set; }
         public Color PinColor { get; set; } = Colors.Red;
 
-        // Kịch bản thuyết minh theo mã ngôn ngữ (key = "vi" / "en" / ...).
-        // Nạp từ Local DB sau khi sync + bổ sung từ phản hồi geo/stalls.
-        public Dictionary<string, string> AudioScripts { get; set; } = new Dictionary<string, string>();
+        // URL audio đã được API /api/geo/stalls filter sẵn theo ngôn ngữ + giọng đọc
+        // trong DevicePreference. Mobile chỉ cần download và phát, không cần biết về ngôn ngữ.
+        public string? AudioUrl { get; set; }
 
-        // URL audio đã sinh sẵn theo mã ngôn ngữ. Khi geo/stalls đã trả về AudioUrl thì
-        // có thể phát ngay mà không phải gọi thêm narration endpoint.
-        public Dictionary<string, string> AudioUrls { get; set; } = new Dictionary<string, string>();
+        // Bán kính (mét) để tự động phát thuyết minh khi user vào trong vùng POI.
+        // Lấy từ GeoStallDto.RadiusMeters. Mặc định 50m nếu API không trả về.
+        public double RadiusMeters { get; set; } = 50;
 
         // Trạng thái được chọn - dùng cho DataTrigger trong XAML để đổi màu card.
         // Khi user bấm 1 POI thì IsSelected = true, bấm lại sẽ về false (toggle).
@@ -70,6 +70,9 @@ namespace VinhThucAudioGuide
         private int _speechId = 0;
         private POI _selectedPoiForAudio = null;
         private string _activeCategoryFilter = string.Empty;
+        // POI vua duoc auto-play do GPS gan day. Reset khi user roi khoi vung,
+        // de lan toi quay lai se phat lai. Tranh spam phat lap khi user dung tai cho.
+        private string? _lastAutoPlayedPoiServerId;
 
         // Background GPS tracking
         private CancellationTokenSource _locationCts;
@@ -134,6 +137,9 @@ namespace VinhThucAudioGuide
                             mapView.MyLocationLayer.UpdateMyLocation(
                                 new Mapsui.UI.Maui.Position(loc.Latitude, loc.Longitude)));
 
+                        // Kiem tra GPS co vao trong vung POI nao khong -> auto-play
+                        CheckProximityAutoPlay(loc);
+
                         var entry = new Services.LocationLogEntry
                         {
                             Latitude = loc.Latitude,
@@ -167,6 +173,64 @@ namespace VinhThucAudioGuide
             }
         }
 
+        /// <summary>
+        /// Khi GPS cap nhat, kiem tra xem user co vao trong vung RadiusMeters cua POI nao khong.
+        /// Neu co va POI do khac POI vua phat thi tu dong phat thuyet minh.
+        /// Toggle "AutoPlay" trong Settings co the tat tinh nang nay.
+        /// </summary>
+        private void CheckProximityAutoPlay(Location userLoc)
+        {
+            if (_allPois == null || _allPois.Count == 0) return;
+            if (!Preferences.Default.Get("AutoPlay", true)) return;
+
+            POI? insidePoi = null;
+            double bestDistance = double.MaxValue;
+            foreach (var poi in _allPois)
+            {
+                if (string.IsNullOrWhiteSpace(poi.AudioUrl)) continue; // POI chua co audio thi bo qua
+                double dist = HaversineMeters(userLoc.Latitude, userLoc.Longitude, poi.Latitude, poi.Longitude);
+                double radius = poi.RadiusMeters > 0 ? poi.RadiusMeters : 50;
+                if (dist <= radius && dist < bestDistance)
+                {
+                    insidePoi = poi;
+                    bestDistance = dist;
+                }
+            }
+
+            if (insidePoi == null)
+            {
+                // Ra khoi moi vung POI -> reset de lan toi vao lai se phat moi
+                _lastAutoPlayedPoiServerId = null;
+                return;
+            }
+
+            if (string.Equals(insidePoi.ServerId, _lastAutoPlayedPoiServerId, StringComparison.OrdinalIgnoreCase))
+                return; // van dang trong vung POI vua phat -> khong phat lap
+
+            _lastAutoPlayedPoiServerId = insidePoi.ServerId;
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await PlayPoiAudioAsync(insidePoi, manualTrigger: false);
+            });
+        }
+
+        /// <summary>
+        /// Tinh khoang cach (met) giua 2 toa do GPS bang cong thuc Haversine (chinh xac tren mat cau).
+        /// Ban kinh Trai Dat dung 6,371,000 m. Du cho khoang cach vai chuc met.
+        /// </summary>
+        private static double HaversineMeters(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6_371_000;
+            double dLat = (lat2 - lat1) * Math.PI / 180.0;
+            double dLon = (lon2 - lon1) * Math.PI / 180.0;
+            double sinDLat = Math.Sin(dLat / 2);
+            double sinDLon = Math.Sin(dLon / 2);
+            double a = sinDLat * sinDLat
+                     + Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0)
+                     * sinDLon * sinDLon;
+            return 2 * R * Math.Asin(Math.Min(1, Math.Sqrt(a)));
+        }
+
         private void UpdateLocalizedTexts()
         {
             var lm = LocalizationManager.Instance;
@@ -198,67 +262,37 @@ namespace VinhThucAudioGuide
             var dbService = new VinhThucAudioGuide.Services.LocalDbService();
             var apiService = IPlatformApplication.Current?.Services.GetService<Services.ApiService>();
 
-            // Thử tải danh sách gian hàng từ API trước
+            // Tai danh sach stall tu API. Server da filter NarrationContent + AudioUrl
+            // theo DevicePreference (ngon ngu + giong doc user da chon o LanguageSelectionPage).
+            // Mobile chi can dung truc tiep AudioUrl, khong can biet ve ngon ngu.
             bool loadedFromApi = false;
             if (apiService != null)
             {
                 var stalls = await apiService.GetStallsAsync();
                 if (stalls != null && stalls.Count > 0)
                 {
-                    // Map LanguageId (Guid) -> mã ngôn ngữ ("vi"/"en"/...) để gán cho AudioScripts.
-                    // Trang web cấu hình ngôn ngữ qua DB, mobile chỉ biết qua sync.
-                    var langCodeById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    try
-                    {
-                        var allLangs = await dbService.GetAllLanguages();
-                        foreach (var l in allLangs)
-                        {
-                            if (!string.IsNullOrEmpty(l.ServerId) && !string.IsNullOrEmpty(l.LangCode))
-                                langCodeById[l.ServerId] = l.LangCode;
-                        }
-                    }
-                    catch { }
-
                     foreach (var stall in stalls)
                     {
+                        var nc = stall.NarrationContent;
                         var poi = new POI
                         {
-                            ServerId = stall.StallId,
-                            Name = stall.StallName,
-                            Address = stall.NarrationContent?.Description ?? string.Empty,
-                            ImageUrl = stall.MediaImages.Count > 0 ? stall.MediaImages[0].Url : string.Empty,
-                            Latitude = stall.Latitude,
-                            Longitude = stall.Longitude
+                            ServerId     = stall.StallId,
+                            Name         = stall.StallName,
+                            Address      = nc?.Description ?? string.Empty,
+                            ImageUrl     = stall.MediaImages.Count > 0 ? stall.MediaImages[0].Url : string.Empty,
+                            Latitude     = stall.Latitude,
+                            Longitude    = stall.Longitude,
+                            RadiusMeters = stall.RadiusMeters > 0 ? stall.RadiusMeters : 50,
+                            AudioUrl     = nc?.AudioUrl
                         };
 
-                        // Nạp script âm thanh từ DB cục bộ nếu có (sync từ /audiocontent/sync)
+                        // Lay them Id cuc bo neu da sync truoc do (chi dung cho ListView highlighting).
                         try
                         {
                             var localLoc = await dbService.GetTourLocationByServerId(stall.StallId);
-                            if (localLoc != null)
-                            {
-                                poi.Id = localLoc.Id;
-                                var dbScripts = await dbService.GetScriptsForLocation(localLoc.Id);
-                                if (dbScripts != null)
-                                {
-                                    foreach (var kv in dbScripts)
-                                        poi.AudioScripts[kv.Key] = kv.Value;
-                                }
-                            }
+                            if (localLoc != null) poi.Id = localLoc.Id;
                         }
                         catch { }
-
-                        // Bổ sung từ phản hồi geo/stalls — đây là dữ liệu mới nhất từ web,
-                        // có cả ScriptText và AudioUrl đã sinh sẵn ở Blob Storage.
-                        var nc = stall.NarrationContent;
-                        if (nc != null && !string.IsNullOrEmpty(nc.LanguageId)
-                            && langCodeById.TryGetValue(nc.LanguageId, out var langCode))
-                        {
-                            if (!string.IsNullOrWhiteSpace(nc.ScriptText))
-                                poi.AudioScripts[langCode] = nc.ScriptText;
-                            if (!string.IsNullOrWhiteSpace(nc.AudioUrl))
-                                poi.AudioUrls[langCode] = nc.AudioUrl;
-                        }
 
                         _allPois.Add(poi);
                     }
@@ -266,30 +300,22 @@ namespace VinhThucAudioGuide
                 }
             }
 
-            // Fallback: tải từ DB cục bộ nếu API không có dữ liệu
+            // Fallback offline: tai POI tu local DB. AudioUrl se rong, user can co mang lan dau de co audio.
             if (!loadedFromApi)
             {
                 var danhSachTuDB = await dbService.GetAllTourLocations();
                 foreach (var loc in danhSachTuDB.Where(l => l.IsActive))
                 {
-                    var poi = new POI
+                    _allPois.Add(new POI
                     {
-                        Id = loc.Id,
-                        ServerId = loc.ServerId,
-                        Name = loc.LocationName,
-                        Address = loc.Address,
-                        ImageUrl = loc.ImageUrl,
-                        Latitude = loc.Latitude,
+                        Id        = loc.Id,
+                        ServerId  = loc.ServerId,
+                        Name      = loc.LocationName,
+                        Address   = loc.Address,
+                        ImageUrl  = loc.ImageUrl,
+                        Latitude  = loc.Latitude,
                         Longitude = loc.Longitude
-                    };
-                    try
-                    {
-                        var scripts = await dbService.GetScriptsForLocation(loc.Id);
-                        if (scripts != null && scripts.Count > 0)
-                            poi.AudioScripts = scripts;
-                    }
-                    catch { }
-                    _allPois.Add(poi);
+                    });
                 }
             }
 
@@ -451,257 +477,74 @@ namespace VinhThucAudioGuide
             }
         }
 
-        private async void Speak_Clicked(object sender, EventArgs e) //thuyết minh
+        // Bam nut Phat thuyet minh: chi don gian phat AudioUrl da co san tu /api/geo/stalls.
+        // Server da filter theo DevicePreference (ngon ngu + giong doc user chon o LanguageSelectionPage),
+        // mobile khong can quan tam ngon ngu nao -> khong action sheet, khong TTS fallback.
+        private async void Speak_Clicked(object sender, EventArgs e)
         {
             if (_selectedPoiForAudio == null)
             {
-                var lmNotice = LocalizationManager.Instance;
-                await DisplayAlert(lmNotice.NoticeTitle, lmNotice.SelectPoiNotice, lmNotice.OkButton);
+                var lm = LocalizationManager.Instance;
+                await DisplayAlert(lm.NoticeTitle, lm.SelectPoiNotice, lm.OkButton);
                 return;
             }
+            await PlayPoiAudioAsync(_selectedPoiForAudio, manualTrigger: true);
+        }
 
-            var selectedPoi = _selectedPoiForAudio;
-            var db = new Services.LocalDbService();
-            var allLangs = await db.GetAllLanguages();
+        /// <summary>
+        /// Phat thuyet minh cua mot POI. Goi tu:
+        ///  - Speak_Clicked (user bam nut)
+        ///  - CheckProximityAutoPlay (GPS vao trong RadiusMeters cua POI)
+        /// </summary>
+        /// <param name="poi">POI can phat. AudioUrl phai khac null.</param>
+        /// <param name="manualTrigger">true neu user chu dong bam nut -> hien alert khi loi.
+        /// false neu auto-play do gan POI -> im lang khi khong co audio.</param>
+        private async Task PlayPoiAudioAsync(POI poi, bool manualTrigger)
+        {
+            if (poi == null) return;
 
-            if (allLangs == null || allLangs.Count == 0)
+            if (string.IsNullOrWhiteSpace(poi.AudioUrl))
             {
-                await DisplayAlert("Thông báo", "Chưa có dữ liệu ngôn ngữ thuyết minh. Vui lòng kiểm tra kết nối!", "OK");
+                if (manualTrigger)
+                {
+                    await DisplayAlert(
+                        "Chưa có thuyết minh",
+                        "POI này chưa có audio thuyết minh. Vui lòng tạo Audio URL trên trang quản trị web rồi thử lại.",
+                        "OK");
+                }
                 return;
-            }
-
-            // Hiển thị danh sách ngôn ngữ kèm cờ quốc gia.
-            // FlagCode lấy từ Server (vd: "vn", "us", "fr") → convert sang emoji 🇻🇳/🇺🇸/🇫🇷
-            // bằng regional indicator symbols để hiển thị đa nền tảng.
-            string[] langDisplayLabels = allLangs.Select(l =>
-            {
-                var flag = BuildFlagEmoji(l.FlagCode);
-                return string.IsNullOrEmpty(flag) ? l.LangName : $"{flag} {l.LangName}";
-            }).ToArray();
-            string action = await DisplayActionSheet("Chọn ngôn ngữ thuyết minh", "Hủy", null, langDisplayLabels);
-            
-            if (action == "Hủy" || string.IsNullOrEmpty(action)) return;
-
-            // Người dùng chọn label "🇻🇳 Tiếng Việt", cần match theo LangName để lấy đúng record.
-            var selectedLang = allLangs.FirstOrDefault(l =>
-                action == l.LangName ||
-                action.EndsWith(l.LangName, StringComparison.Ordinal) ||
-                action.Contains(l.LangName));
-            if (selectedLang == null) return;
-
-            string lang = selectedLang.LangCode;
-            // Chỉ giữ kịch bản đã sync sẵn cho ĐÚNG ngôn ngữ này. Tuyệt đối không fallback sang
-            // tên POI hay script tiếng Việt cho các ngôn ngữ ngoại — đó là nguyên nhân app trước
-            // đây "đọc tên POI" thay vì phát audio đúng.
-            string text = selectedPoi.AudioScripts.GetValueOrDefault(lang, string.Empty);
-            // Đánh dấu kịch bản hiện có là KHỚP ngôn ngữ nếu nó được sync từ DB theo đúng mã ngôn ngữ.
-            // Khi gọi /api/mobile/narration, biến này sẽ được cập nhật theo SourceLanguageId từ server.
-            bool scriptMatchesLang = !string.IsNullOrWhiteSpace(text);
-
-            // Bước 3: Chọn Giọng đọc (Lấy từ Server)
-            var apiService = IPlatformApplication.Current?.Services.GetService<Services.ApiService>();
-            var voices = new List<Services.SyncVoiceProfile>();
-            if (apiService != null && !string.IsNullOrEmpty(selectedLang.ServerId))
-                voices = await apiService.GetVoicesAsync(selectedLang.ServerId);
-
-            Guid? selectedVoiceId = null;
-            if (voices != null && voices.Count > 0)
-            {
-                string[] voiceNames = voices.Select(v => v.DisplayName).ToArray();
-                string voiceAction = await DisplayActionSheet("Chọn giọng đọc", "Hủy", null, voiceNames);
-                if (voiceAction != "Hủy" && !string.IsNullOrEmpty(voiceAction))
-                    selectedVoiceId = voices.FirstOrDefault(v => v.DisplayName == voiceAction)?.Id;
             }
 
             _speechId++;
             int currentId = _speechId;
             _currentAudioPlayer?.Stop();
 
-            // ===== Nguồn 1: Audio đã sinh sẵn trên Server (Blob Storage) =====
-            // Web admin đã tạo TTS audio cho từng narration content. Mobile chỉ cần
-            // lấy AudioUrl rồi download mp3 và phát. Đây là nguồn chính, ổn định, có cùng
-            // nội dung kịch bản với web.
             try
             {
-                string? audioUrl = null;
-                string? freshScript = null;
-
-                // 1a) Hỏi server narration info để lấy đúng audio cho ngôn ngữ + voice user chọn.
-                if (apiService != null)
+                var bytes = await Services.ApiService.DownloadAudioAsync(poi.AudioUrl);
+                if (currentId != _speechId) return; // user da bam Stop hoac chuyen POI
+                if (bytes == null || bytes.Length == 0)
                 {
-                    var info = await apiService.GetNarrationAsync(selectedPoi.ServerId, lang, selectedVoiceId);
-                    if (info != null)
+                    if (manualTrigger)
                     {
-                        audioUrl = info.AudioUrl;
-                        freshScript = info.ScriptText;
-
-                        // Kịch bản ScriptText chỉ thật sự khớp ngôn ngữ khi SourceLanguageId == LanguageId,
-                        // tức server có content đúng ngôn ngữ. Nếu không (vd content gốc tiếng Việt
-                        // nhưng user chọn tiếng Anh) thì KHÔNG đưa text này cho Google/MAUI TTS,
-                        // tránh tình trạng đọc tiếng Việt bằng giọng tiếng Anh nghe lơ lớ.
-                        bool serverScriptMatches =
-                            !string.IsNullOrWhiteSpace(info.LanguageId)
-                            && !string.IsNullOrWhiteSpace(info.SourceLanguageId)
-                            && string.Equals(info.LanguageId, info.SourceLanguageId, StringComparison.OrdinalIgnoreCase);
-
-                        // Chỉ lưu/cập nhật script khi nó đúng là ngôn ngữ user chọn.
-                        if (serverScriptMatches && !string.IsNullOrWhiteSpace(freshScript))
-                        {
-                            selectedPoi.AudioScripts[lang] = freshScript;
-                            text = freshScript;
-                            scriptMatchesLang = true;
-                        }
-                        else if (!serverScriptMatches)
-                        {
-                            // Server trả về script của ngôn ngữ khác → bỏ qua, đảm bảo fallback TTS không phát sai.
-                            freshScript = null;
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(audioUrl))
-                            selectedPoi.AudioUrls[lang] = audioUrl;
+                        var lm = LocalizationManager.Instance;
+                        await DisplayAlert(lm.AudioErrorTitle, lm.TtsPlaybackFailedMessage, lm.OkButton);
                     }
+                    return;
                 }
 
-                // 1b) Nếu narration endpoint chưa có (server cũ chưa deploy bản mới),
-                //     thử dùng AudioUrl đã có sẵn trong cache từ /geo/stalls.
-                if (string.IsNullOrWhiteSpace(audioUrl))
-                    selectedPoi.AudioUrls.TryGetValue(lang, out audioUrl);
-
-                if (!string.IsNullOrWhiteSpace(audioUrl) && currentId == _speechId)
-                {
-                    var bytes = await Services.ApiService.DownloadAudioAsync(audioUrl);
-                    if (currentId != _speechId) return;
-                    if (bytes != null && bytes.Length > 0)
-                    {
-                        _currentAudioPlayer?.Stop();
-                        _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(bytes));
-                        _currentAudioPlayer.Play();
-
-                        // Cache best-effort cho lần phát sau khi mất mạng.
-                        _ = Services.AudioCacheService.GetOrFetchAudioAsync(selectedPoi.ServerId, lang);
-                        return;
-                    }
-                }
+                _currentAudioPlayer?.Stop();
+                _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(bytes));
+                _currentAudioPlayer.Play();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[Speak] Server audio failed: {ex.Message}");
-                /* Server lỗi → thử nguồn tiếp theo */
-            }
-
-            // ===== Nguồn 2: /api/mobile/tts (sinh TTS realtime nếu blob chưa có) =====
-            string apiBase = Services.ApiService.GetConfiguredApiBase();
-            if (currentId == _speechId
-                && !string.IsNullOrWhiteSpace(apiBase)
-                && !string.IsNullOrEmpty(selectedPoi.ServerId))
-            {
-                try
+                System.Diagnostics.Debug.WriteLine($"[PlayPoiAudio] {ex.Message}");
+                if (manualTrigger)
                 {
-                    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-                    string ttsUrl = apiBase.TrimEnd('/') + $"/api/mobile/tts?stallId={selectedPoi.ServerId}&lang={lang}";
-                    if (selectedVoiceId.HasValue) ttsUrl += $"&voiceId={selectedVoiceId.Value}";
-
-                    var ttsBytes = await client.GetByteArrayAsync(ttsUrl);
-                    if (currentId != _speechId) return;
-                    if (ttsBytes != null && ttsBytes.Length > 0)
-                    {
-                        _currentAudioPlayer?.Stop();
-                        _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(ttsBytes));
-                        _currentAudioPlayer.Play();
-                        return;
-                    }
+                    var lm = LocalizationManager.Instance;
+                    await DisplayAlert(lm.AudioErrorTitle, ex.Message, lm.OkButton);
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[Speak] /api/mobile/tts failed: {ex.Message}");
-                }
-            }
-
-            // ===== Nguồn 3: Google Translate TTS =====
-            // Chỉ chạy khi text thực sự đúng ngôn ngữ user chọn — tránh đọc tiếng Việt
-            // bằng giọng nước ngoài, dẫn đến nghe "lơ lớ" / không hiểu gì.
-            if (scriptMatchesLang && !string.IsNullOrWhiteSpace(text))
-            {
-                bool playedFromGoogle = false;
-                try
-                {
-                    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-
-                    var rawParts = text.Split(new[] { '.', '\n', '?', '!' }, StringSplitOptions.RemoveEmptyEntries);
-                    var finalSentences = new List<string>();
-                    foreach (var part in rawParts)
-                    {
-                        var words = part.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
-                        string chunk = "";
-                        foreach (var word in words)
-                        {
-                            if (chunk.Length + word.Length > 150) { finalSentences.Add(chunk.Trim()); chunk = ""; }
-                            chunk += word + " ";
-                        }
-                        if (!string.IsNullOrWhiteSpace(chunk)) finalSentences.Add(chunk.Trim());
-                    }
-
-                    foreach (var sentence in finalSentences)
-                    {
-                        if (currentId != _speechId) break;
-                        string cleanSentence = sentence.Trim();
-                        if (string.IsNullOrEmpty(cleanSentence)) continue;
-
-                        // Google Translate TTS dùng mã ngắn ("vi", "en", "fr"...) không nhận "vi-VN".
-                        // Chuyển locale "xx-YY" → "xx" để giọng đọc đúng ngôn ngữ, tránh giọng mặc định "lơ lớ".
-                        var googleLang = lang.Contains('-') ? lang.Split('-')[0].ToLowerInvariant() : lang.ToLowerInvariant();
-                        var url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(cleanSentence)}&tl={googleLang}&client=tw-ob";
-                        var audioBytes = await client.GetByteArrayAsync(url);
-                        if (currentId != _speechId) break;
-
-                        _currentAudioPlayer?.Stop();
-                        _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(audioBytes));
-                        _currentAudioPlayer.Play();
-                        playedFromGoogle = true;
-
-                        await Task.Delay(300);
-                        while (_currentAudioPlayer.IsPlaying && currentId == _speechId)
-                            await Task.Delay(100);
-                    }
-                }
-                catch { /* Google block → thử nguồn tiếp theo */ }
-
-                if (playedFromGoogle) return;
-            }
-
-            // ===== Nguồn 4: MAUI built-in TextToSpeech (không cần DependencyService) =====
-            // Khi không có text đúng ngôn ngữ thì không thử MAUI TTS nữa, vì nó cũng sẽ
-            // phát sai. Thay vào đó báo cho user biết server chưa có audio cho ngôn ngữ này.
-            if (!scriptMatchesLang || string.IsNullOrWhiteSpace(text))
-            {
-                await DisplayAlert(
-                    "Chưa có thuyết minh",
-                    $"Hiện chưa có audio thuyết minh cho ngôn ngữ \"{selectedLang.LangName}\" của POI này. " +
-                    "Vui lòng tạo audio/giọng đọc trên trang quản trị web (Audio URL) rồi thử lại.",
-                    "OK");
-                return;
-            }
-
-            try
-            {
-                // Tách locale gốc và mã ngôn ngữ ngắn để khớp với danh sách MAUI TTS locales.
-                // Ưu tiên khớp chính xác "vi-VN", nếu không có thì khớp prefix "vi" → tránh
-                // chọn nhầm locale khác (vd ngôn ngữ tiếng Việt bị fallback về tiếng Anh).
-                var langPrefix = lang.Contains('-') ? lang.Split('-')[0] : lang;
-                var locales = await TextToSpeech.Default.GetLocalesAsync();
-                var matchedLocale = locales.FirstOrDefault(l =>
-                        string.Equals(l.Language, lang, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals($"{l.Language}-{l.Country}", lang, StringComparison.OrdinalIgnoreCase))
-                    ?? locales.FirstOrDefault(l =>
-                        l.Language.Equals(langPrefix, StringComparison.OrdinalIgnoreCase));
-
-                await TextToSpeech.Default.SpeakAsync(text, new SpeechOptions { Locale = matchedLocale });
-            }
-            catch
-            {
-                var lmError = LocalizationManager.Instance;
-                await DisplayAlert(lmError.AudioErrorTitle, lmError.TtsPlaybackFailedMessage, lmError.OkButton);
             }
         }
 
@@ -738,24 +581,6 @@ namespace VinhThucAudioGuide
             ApplyCategoryFilter();
         }
 
-        // ====== Helper: chuyển FlagCode ISO-2 (vd "vn", "us", "fr") thành emoji 🇻🇳/🇺🇸/🇫🇷 ======
-        // Mỗi ký tự A-Z map vào Unicode regional indicator symbol (U+1F1E6..U+1F1FF).
-        // Ghép 2 regional indicator → trình hiển thị tự render thành emoji lá cờ.
-        // Trả về chuỗi rỗng nếu FlagCode null/quá ngắn/không phải chữ cái.
-        private static string BuildFlagEmoji(string flagCode)
-        {
-            if (string.IsNullOrWhiteSpace(flagCode) || flagCode.Length < 2)
-                return string.Empty;
-
-            char c1 = char.ToUpperInvariant(flagCode[0]);
-            char c2 = char.ToUpperInvariant(flagCode[1]);
-            if (c1 < 'A' || c1 > 'Z' || c2 < 'A' || c2 > 'Z')
-                return string.Empty;
-
-            int code1 = 0x1F1E6 + (c1 - 'A');
-            int code2 = 0x1F1E6 + (c2 - 'A');
-            return char.ConvertFromUtf32(code1) + char.ConvertFromUtf32(code2);
-        }
     }
 
 }

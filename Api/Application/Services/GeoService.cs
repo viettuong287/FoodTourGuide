@@ -80,15 +80,17 @@ namespace Api.Application.Services
                 .AsNoTracking()
                 .Where(l => l.IsActive && l.Stall.IsActive && l.Stall.Business.IsActive);
 
+            // Filtered Include (EF Core 5+): .Where() bên trong ThenInclude lọc dữ liệu liên quan
+            // ngay ở tầng SQL — vừa nhanh, vừa đảm bảo collection trả về chỉ chứa đúng ngôn ngữ.
             IQueryable<StallLocation> locationsQuery;
             if (languageId != Guid.Empty)
             {
-                // Có ngôn ngữ xác định: lọc narration content theo đúng ngôn ngữ đó
-                // Filtered Include (EF Core 5+): .Where() bên trong ThenInclude lọc dữ liệu liên quan
+                // Lọc CHẶT theo languageId của thiết bị: chỉ load content đúng ngôn ngữ user đã chọn.
+                // Tránh tình trạng FirstOrDefault() vô tình trả về content tiếng Việt khi user chọn EN.
                 locationsQuery = baseQuery
                     .Include(l => l.Stall)
                         .ThenInclude(s => s.StallNarrationContents
-                            .Where(c => c.IsActive))
+                            .Where(c => c.IsActive && c.LanguageId == languageId))
                         .ThenInclude(c => c.NarrationAudios)
                     .Include(l => l.Stall)
                         .ThenInclude(s => s.StallMedia
@@ -97,8 +99,8 @@ namespace Api.Application.Services
             }
             else
             {
-                // languageId = Guid.Empty: không tìm được ngôn ngữ fallback
-                // → bỏ filter ngôn ngữ, lấy tất cả content đang active để tránh NarrationAudios rỗng
+                // languageId = Guid.Empty: không xác định được ngôn ngữ → load tất cả content active.
+                // Khi map sẽ ưu tiên tiếng Việt làm fallback.
                 locationsQuery = baseQuery
                     .Include(l => l.Stall)
                         .ThenInclude(s => s.StallNarrationContents
@@ -113,10 +115,17 @@ namespace Api.Application.Services
             var locations = await locationsQuery.ToListAsync(cancellationToken);
             _logger.LogInformation("GetAllStallsAsync: truy vấn được {Total} vị trí gian hàng", locations.Count);
 
-            // Bước 3: Map từng StallLocation sang GeoStallDto
+            // Bước 3: Map từng StallLocation sang GeoStallDto.
+            // Khi languageId != Empty, collection đã được filter chỉ còn đúng ngôn ngữ đó → FirstOrDefault() an toàn.
+            // Nếu POI không có content cho ngôn ngữ này, NarrationContent = null → Mobile sẽ báo "chưa có thuyết minh".
             var result = locations.Select(l =>
             {
-                var contents = l.Stall.StallNarrationContents; // đã được lọc IsActive = true từ query
+                var contents = l.Stall.StallNarrationContents;
+
+                // Pick content theo ngôn ngữ: ưu tiên đúng languageId nếu có, không có thì null.
+                var picked = languageId != Guid.Empty
+                    ? contents.FirstOrDefault(c => c.LanguageId == languageId)
+                    : contents.FirstOrDefault();
 
                 return new GeoStallDto
                 {
@@ -125,16 +134,16 @@ namespace Api.Application.Services
                     Latitude = (double)l.Latitude,
                     Longitude = (double)l.Longitude,
                     RadiusMeters = (double)l.RadiusMeters,
-                    NarrationContent = contents.Select(c => new GeoStallNarrationContentDto
+                    NarrationContent = picked == null ? null : new GeoStallNarrationContentDto
                     {
-                        Id          = c.Id,
-                        LanguageId  = c.LanguageId,
-                        Title       = c.Title,
-                        Description = c.Description,
-                        ScriptText  = c.ScriptText,
-                        UpdatedAt   = c.UpdatedAt,
-                        AudioUrl    = PickAudioUrl(c.NarrationAudios, preferredVoice)
-                    }).FirstOrDefault(),
+                        Id          = picked.Id,
+                        LanguageId  = picked.LanguageId,
+                        Title       = picked.Title,
+                        Description = picked.Description,
+                        ScriptText  = picked.ScriptText,
+                        UpdatedAt   = picked.UpdatedAt,
+                        AudioUrl    = PickAudioUrl(picked.NarrationAudios, preferredVoice)
+                    },
                     MediaImages = l.Stall.StallMedia
                         .Select(m => new GeoStallMediaDto { Url = m.MediaUrl, Caption = m.Caption })
                         .ToList()

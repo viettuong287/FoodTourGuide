@@ -72,7 +72,11 @@ public class ApiService
     }
 
     /// <summary>
-    /// Gửi tín hiệu Heartbeat để Server biết thiết bị vẫn đang online (thời gian thực)
+    /// Gửi tín hiệu Heartbeat để Server biết thiết bị vẫn đang online (thời gian thực).
+    /// QUAN TRỌNG: Luôn ưu tiên pref_language_id / pref_voice_id mà user đã chọn trong
+    /// LanguageSelectionPage/VoiceSelectionPage, tránh ghi đè bằng default language ("vi")
+    /// mỗi lần app khởi động — vốn là nguyên nhân khiến POI tự đọc tiếng Việt.
+    /// Nếu chưa có pref nào và parameter không có → bỏ qua POST hoàn toàn để giữ preference cũ trên server.
     /// </summary>
     public async Task SendHeartbeatAsync(string languageId = null, bool? autoPlay = null, double? speechRate = null)
     {
@@ -82,13 +86,26 @@ public class ApiService
 
             var deviceId = GetOrCreateDeviceId();
 
-            if (string.IsNullOrEmpty(languageId))
-                languageId = Guid.Empty.ToString();
+            // Ưu tiên ngôn ngữ + giọng user đã chọn — KHÔNG cho phép default language overwrite.
+            var savedLang = Preferences.Default.Get("pref_language_id", string.Empty);
+            if (!string.IsNullOrEmpty(savedLang))
+                languageId = savedLang;
+
+            var savedVoice = Preferences.Default.Get("pref_voice_id", string.Empty);
+            Guid? voiceId = Guid.TryParse(savedVoice, out var vGuid) ? vGuid : null;
+
+            // Không có info gì hợp lệ → bỏ qua POST, server giữ nguyên preference cũ.
+            if (string.IsNullOrEmpty(languageId) || languageId == Guid.Empty.ToString())
+            {
+                System.Diagnostics.Debug.WriteLine($"[Heartbeat] Skipped for {deviceId} (no language pref yet).");
+                return;
+            }
 
             var deviceDto = new
             {
                 DeviceId = deviceId,
                 LanguageId = languageId,
+                VoiceId = voiceId,
                 Platform = DeviceInfo.Current.Platform.ToString(),
                 DeviceModel = DeviceInfo.Current.Model,
                 Manufacturer = DeviceInfo.Current.Manufacturer,
@@ -98,7 +115,7 @@ public class ApiService
             };
 
             var response = await _httpClient.PostAsJsonAsync("device-preference", deviceDto);
-            System.Diagnostics.Debug.WriteLine($"[Heartbeat] Sent for {deviceId}. Status: {response.StatusCode}");
+            System.Diagnostics.Debug.WriteLine($"[Heartbeat] Sent for {deviceId} (lang={languageId}, voice={voiceId}). Status: {response.StatusCode}");
         }
         catch (Exception ex) 
         { 
@@ -321,7 +338,11 @@ public class ApiService
         catch (Exception ex) { Console.WriteLine($"[LocationBatch] {ex.Message}"); }
     }
 
-    private string GetOrCreateDeviceId()
+    /// <summary>
+    /// Lấy DeviceId duy nhất của thiết bị. Nếu chưa có trong Preferences thì sinh mới Guid và lưu lại.
+    /// Public static để các page (chọn ngôn ngữ / chọn giọng) cũng dùng được khi POST device-preference.
+    /// </summary>
+    public static string GetOrCreateDeviceId()
     {
         var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
         if (string.IsNullOrEmpty(deviceId))
@@ -330,6 +351,45 @@ public class ApiService
             Preferences.Default.Set("UniqueDeviceId", deviceId);
         }
         return deviceId;
+    }
+
+    /// <summary>
+    /// POST /api/device-preference để lưu lựa chọn ngôn ngữ + giọng đọc của thiết bị lên server.
+    /// Dùng cho luồng "chọn ngôn ngữ → chọn giọng → vào app" sau khi quét QR.
+    /// </summary>
+    /// <param name="languageId">Guid LanguageId trên server (lấy từ /languages/active).</param>
+    /// <param name="voiceId">Guid voice profile (có thể null nếu user không chọn giọng cụ thể).</param>
+    /// <returns>true nếu API trả về 2xx; ngược lại false.</returns>
+    public async Task<bool> SaveDevicePreferenceAsync(string languageId, Guid? voiceId)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return false;
+            if (string.IsNullOrWhiteSpace(languageId)) return false;
+
+            var deviceId = GetOrCreateDeviceId();
+            var body = new
+            {
+                DeviceId = deviceId,
+                LanguageId = languageId,
+                VoiceId = voiceId,
+                SpeechRate = Preferences.Default.Get("VoiceSpeed", 1.0),
+                AutoPlay = Preferences.Default.Get("AutoPlay", true),
+                Platform = DeviceInfo.Current.Platform.ToString(),
+                DeviceModel = DeviceInfo.Current.Model,
+                Manufacturer = DeviceInfo.Current.Manufacturer,
+                OsVersion = DeviceInfo.Current.VersionString
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("device-preference", body);
+            System.Diagnostics.Debug.WriteLine($"[DevicePref] Save status: {response.StatusCode}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[DevicePref] Save error: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>

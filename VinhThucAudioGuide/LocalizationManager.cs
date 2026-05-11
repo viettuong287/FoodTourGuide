@@ -20,6 +20,43 @@ public class LocalizationManager : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Đặt ngôn ngữ UI theo language code chuẩn (vi/en/fr/zh/ko/...).
+    /// Dùng thay cho việc gán CurrentLanguage trực tiếp vì server có thể trả DisplayName
+    /// không khớp (vd "Vietnamese" thay vì "Tiếng Việt") khiến UI fallback về VI.
+    /// </summary>
+    public void SetLanguageByCode(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return;
+        var lower = code.ToLowerInvariant();
+        CurrentLanguage = lower switch
+        {
+            "en" or "en-us" or "en-gb" => "English",
+            "fr" or "fr-fr" => "Français",
+            "zh" or "zh-cn" or "zh-tw" or "zh-hans" or "zh-hant" => "中文",
+            "ko" or "ko-kr" => "한국어",
+            _ => "Tiếng Việt"
+        };
+    }
+
+    /// <summary>Tra cờ emoji ứng với language code chuẩn.</summary>
+    public static string GetFlagByCode(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return "🌐";
+        var lower = code.ToLowerInvariant();
+        return lower switch
+        {
+            "en" or "en-us" => "🇺🇸",
+            "en-gb" => "🇬🇧",
+            "fr" or "fr-fr" => "🇫🇷",
+            "zh" or "zh-cn" or "zh-hans" => "🇨🇳",
+            "zh-tw" or "zh-hant" => "🇹🇼",
+            "ko" or "ko-kr" => "🇰🇷",
+            "vi" or "vi-vn" => "🇻🇳",
+            _ => "🌐"
+        };
+    }
+
     // --- KỊCH BẢN THUYẾT MINH 5 THỨ TIẾNG ---
     public string AudioScript => CurrentLanguage switch
     {

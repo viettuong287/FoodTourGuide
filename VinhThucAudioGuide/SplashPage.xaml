@@ -10,5 +10,40 @@
                Aspect="AspectFill"
                HorizontalOptions="Fill"
                VerticalOptions="Fill" />
+
+        <!-- Overlay loading: dải mờ ở đáy để chữ luôn dễ đọc trên mọi background -->
+        <Grid VerticalOptions="End"
+              HorizontalOptions="Fill"
+              Padding="24,20,24,48"
+              RowSpacing="10"
+              BackgroundColor="#80000000">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Label x:Name="LblStatus"
+                   Grid.Row="0"
+                   Text="Đang khởi động..."
+                   TextColor="White"
+                   FontSize="16"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+
+            <ProgressBar x:Name="PrgLoading"
+                         Grid.Row="1"
+                         Progress="0"
+                         ProgressColor="#4FC3F7"
+                         HeightRequest="6"
+                         HorizontalOptions="Fill" />
+
+            <Label x:Name="LblPercent"
+                   Grid.Row="2"
+                   Text="0%"
+                   TextColor="#B0E0FF"
+                   FontSize="12"
+                   HorizontalOptions="End" />
+        </Grid>
     </Grid>
 </ContentPage>

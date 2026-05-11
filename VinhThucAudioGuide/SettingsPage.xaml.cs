@@ -12,7 +12,6 @@ namespace VinhThucAudioGuide;
 public partial class SettingsPage : ContentPage
 {
     bool isProcessing = false;
-    private List<ActiveLanguage> _serverLanguages = [];
 
     public SettingsPage()
     {
@@ -20,23 +19,12 @@ public partial class SettingsPage : ContentPage
         LoadSettings(); // Tải lại cài đặt cũ khi mở app
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
         LocalizationManager.Instance.PropertyChanged += OnLocalizationChanged;
+        // Mỗi lần quay lại Settings, refresh hiển thị pref hiện tại (vd: vừa đổi ở LanguageSelectionPage)
         UpdateUI();
-        await LoadLanguagesFromServerAsync();
-    }
-
-    private async Task LoadLanguagesFromServerAsync()
-    {
-        var apiService = IPlatformApplication.Current?.Services.GetService<ApiService>();
-        if (apiService != null)
-        {
-            var langs = await apiService.GetActiveLanguagesAsync();
-            if (langs != null && langs.Count > 0)
-                _serverLanguages = langs;
-        }
     }
 
     protected override void OnDisappearing()
@@ -101,11 +89,20 @@ public partial class SettingsPage : ContentPage
 
     private void LoadSettings()
     {
-        string lang = Preferences.Default.Get("AppLang", "Tiếng Việt");
+        // Ưu tiên pref_language_code (chính xác hơn) — fallback "AppLang" để tương thích cũ.
+        var prefCode = Preferences.Default.Get("pref_language_code", string.Empty);
+        if (!string.IsNullOrEmpty(prefCode))
+        {
+            LocalizationManager.Instance.SetLanguageByCode(prefCode);
+        }
+        else
+        {
+            string lang = Preferences.Default.Get("AppLang", "Tiếng Việt");
+            LocalizationManager.Instance.CurrentLanguage = lang;
+        }
+
         bool auto = Preferences.Default.Get("AutoPlay", true);
         double speed = Preferences.Default.Get("VoiceSpeed", 1.0);
-
-        LocalizationManager.Instance.CurrentLanguage = lang;
         SwAutoPlay.IsToggled = auto;
         SldSpeed.Value = speed;
         EntSpeed.Text = speed.ToString("F2");
@@ -114,25 +111,17 @@ public partial class SettingsPage : ContentPage
 
     private async void OnSaveClicked(object sender, EventArgs e)
     {
-        Preferences.Default.Set("AppLang", LocalizationManager.Instance.CurrentLanguage);
+        // Lưu các tuỳ chọn audio (auto play / tốc độ). Ngôn ngữ + giọng đọc được quản lý
+        // ở flow LanguageSelectionPage → VoiceSelectionPage, không đụng tới ở đây để tránh
+        // ghi đè preference user đã chọn.
         Preferences.Default.Set("AutoPlay", SwAutoPlay.IsToggled);
         Preferences.Default.Set("VoiceSpeed", SldSpeed.Value);
 
-        // Gửi cấu hình lên Server với languageId từ API
+        // Gửi cấu hình mới lên server (heartbeat sẽ tự đọc pref_language_id để KHÔNG ghi đè ngôn ngữ).
         var apiService = IPlatformApplication.Current?.Services.GetService<ApiService>();
         if (apiService != null)
         {
-            string langCode = LocalizationManager.Instance.CurrentLanguage switch
-            {
-                "English" => "en",
-                "Français" => "fr",
-                "中文" => "zh",
-                "한국어" => "ko",
-                _ => "vi"
-            };
-            var serverLang = _serverLanguages.FirstOrDefault(l => l.Code == langCode);
-            string languageId = serverLang?.Id ?? Guid.Empty.ToString();
-            await apiService.SendHeartbeatAsync(languageId, SwAutoPlay.IsToggled, SldSpeed.Value);
+            await apiService.SendHeartbeatAsync(autoPlay: SwAutoPlay.IsToggled, speechRate: SldSpeed.Value);
         }
 
         var lm = LocalizationManager.Instance;
@@ -158,42 +147,25 @@ public partial class SettingsPage : ContentPage
         }
     }
 
-    private async void OpenLangMenu(object sender, EventArgs e)
+    // Click vào hàng "Ngôn ngữ ứng dụng" → mở lại flow chọn ngôn ngữ + giọng đọc động từ server
+    // (giống flow sau khi quét QR). Như vậy ngôn ngữ thuyết minh & UI luôn đồng bộ.
+    private void OpenLangMenu(object sender, EventArgs e)
     {
-        Overlay.IsVisible = true;
-        _ = Overlay.FadeTo(0.5);
-        await LangModal.TranslateTo(0, 0, 300, Easing.SpringOut);
+        if (Application.Current != null)
+            Application.Current.MainPage = new NavigationPage(new LanguageSelectionPage());
     }
 
-    private async void CloseLangMenu(object sender, EventArgs e)
+    // CloseLangMenu/OnLangSelected vẫn được giữ trong XAML (để tương thích) nhưng KHÔNG còn dùng.
+    // Có thể được gọi nếu user vô tình tap vào modal cũ — fallback an toàn về flow mới.
+    private void CloseLangMenu(object sender, EventArgs e)
     {
-        _ = Overlay.FadeTo(0);
-        await LangModal.TranslateTo(0, 600, 300, Easing.SpringIn);
         Overlay.IsVisible = false;
+        LangModal.TranslationY = 600;
     }
 
     private void OnLangSelected(object sender, EventArgs e)
     {
-        var btn = (Button)sender;
-        string selectedFull = btn.Text; // VD: "🇻🇳 Tiếng Việt"
-        // Hỗ trợ emoji có thể là 2 codepoints, chuỗi bắt đầu bằng cờ + space
-        string selectedName = selectedFull.Contains(" ") ? selectedFull.Substring(selectedFull.IndexOf(' ')).Trim() : selectedFull;
-
-        // Map display names to internal language keys used by LocalizationManager
-        string langKey = selectedName switch
-        {
-            "Tiếng Việt" => "Tiếng Việt",
-            "English" => "English",
-            "Français" => "Français",
-            "中文" => "中文",
-            "한국어" => "한국어",
-            _ => selectedName
-        };
-
-        LocalizationManager.Instance.CurrentLanguage = langKey;
-        LblCurrentLang.Text = selectedFull; // Gắn luôn cờ lên giao diện
-        UpdateUI();
-        CloseLangMenu(null, null);
+        OpenLangMenu(sender, e);
     }
 
     private void UpdateUI()
@@ -215,15 +187,13 @@ public partial class SettingsPage : ContentPage
 
         GroupLang.Text = lm.GroupLanguage;
         GroupAudio.Text = lm.GroupAudio;
-        LblCurrentLang.Text = GetLanguageDisplayWithFlag(lm.CurrentLanguage);
-    }
 
-    private static string GetLanguageDisplayWithFlag(string langKey) => langKey switch
-    {
-        "English" => "🇬🇧 English",
-        "Français" => "🇫🇷 Français",
-        "中文" => "🇨🇳 中文",
-        "한국어" => "🇰🇷 한국어",
-        _ => "🇻🇳 Tiếng Việt"
-    };
+        // Lấy display + cờ từ pref keys (server-driven), không hardcode 5 ngôn ngữ.
+        var prefDisplay = Preferences.Default.Get("pref_language_display_name", string.Empty);
+        var prefCode = Preferences.Default.Get("pref_language_code", string.Empty);
+        if (string.IsNullOrEmpty(prefDisplay))
+            prefDisplay = lm.CurrentLanguage;
+        var flag = LocalizationManager.GetFlagByCode(prefCode);
+        LblCurrentLang.Text = $"{flag} {prefDisplay}".Trim();
+    }
 }
