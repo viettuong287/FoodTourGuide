@@ -21,7 +21,34 @@ public partial class SplashPage : ContentPage
                 // Lưu lại BaseUrl để các thành phần khác sử dụng (như TTS)
                 Preferences.Default.Set("RemoteApiBase", "https://locateandmultilingualnarration-amgrfua6fbd7gnce.eastasia-01.azurewebsites.net");
 
-                // 1. Kiểm tra lệnh Reset từ Admin
+                // 1a. Kiểm tra phiên bản schema cục bộ — nếu phiên bản đã thay đổi
+                // (vd: lần đầu cài bản mới này, sau khi server xoá toàn bộ POI cũ)
+                // thì xoá DB cục bộ để app sync lại đúng dữ liệu mới, tránh hiển thị POI cũ.
+                const int LocalDbSchemaVersion = 2; // bump khi cấu trúc/POI thay đổi lớn
+                int storedVersion = Preferences.Default.Get("LocalDbSchemaVersion", 0);
+                if (storedVersion < LocalDbSchemaVersion)
+                {
+                    await localDb.ClearAllDataAsync();
+                    Preferences.Default.Remove("LastSyncTime");
+                    Preferences.Default.Set("LocalDbSchemaVersion", LocalDbSchemaVersion);
+
+                    // Xoá luôn file audio đã cache (tts_*.mp3) để không phát nhầm audio cũ
+                    // (audio cũ có thể bị "lơ lớ" do được sinh trước khi sửa logic translation).
+                    try
+                    {
+                        var cacheDir = Microsoft.Maui.Storage.FileSystem.CacheDirectory;
+                        if (System.IO.Directory.Exists(cacheDir))
+                        {
+                            foreach (var f in System.IO.Directory.GetFiles(cacheDir, "tts_*.mp3"))
+                            {
+                                try { System.IO.File.Delete(f); } catch { /* bỏ qua nếu không xoá được */ }
+                            }
+                        }
+                    }
+                    catch { /* không chặn flow khởi động vì lỗi xoá cache */ }
+                }
+
+                // 1b. Kiểm tra lệnh Reset từ Admin
                 bool needsReset = await apiService.CheckResetFlagAsync();
                 if (needsReset)
                 {

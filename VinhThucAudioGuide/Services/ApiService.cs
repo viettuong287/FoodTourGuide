@@ -252,6 +252,53 @@ public class ApiService
     }
 
     /// <summary>
+    /// Lấy thông tin narration (script + audioUrl) cho một stall + ngôn ngữ cụ thể.
+    /// Mobile gọi khi user bấm "Nghe thuyết minh" và đã chọn ngôn ngữ.
+    /// Trả về JSON nhẹ, không stream nhị phân. Mobile sẽ tự download AudioUrl.
+    /// </summary>
+    public async Task<MobileNarrationInfo?> GetNarrationAsync(string stallId, string langCode, Guid? voiceId = null, CancellationToken ct = default)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return null;
+            if (string.IsNullOrWhiteSpace(stallId) || string.IsNullOrWhiteSpace(langCode)) return null;
+
+            var url = $"mobile/narration?stallId={Uri.EscapeDataString(stallId)}&lang={Uri.EscapeDataString(langCode)}";
+            if (voiceId.HasValue) url += $"&voiceId={voiceId.Value}";
+
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = await _httpClient.GetAsync(url, ct);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<MobileNarrationInfo>(options, ct);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[Narration] Status {response.StatusCode} for {url}");
+            }
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Narration] {ex.Message}"); }
+        return null;
+    }
+
+    /// <summary>
+    /// Tải file audio từ AudioUrl (Blob Storage). Có timeout riêng và không dùng BaseAddress
+    /// để cho phép URL tuyệt đối tới blob.
+    /// </summary>
+    public static async Task<byte[]?> DownloadAudioAsync(string audioUrl, CancellationToken ct = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(audioUrl)) return null;
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            var bytes = await client.GetByteArrayAsync(audioUrl, ct);
+            return bytes;
+        }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[DownloadAudio] {ex.Message}"); }
+        return null;
+    }
+
+    /// <summary>
     /// Gửi batch tọa độ GPS lên Server mỗi 20 giây
     /// </summary>
     public async Task SendLocationBatchAsync(List<LocationLogEntry> logs)
@@ -317,6 +364,8 @@ public class SyncLanguage
     public string ServerId { get; set; }
     public string Code { get; set; }
     public string Name { get; set; }
+    // Mã cờ ISO-2 lowercase, vd: vn, us, fr, jp, kr, cn — dùng để mobile hiển thị emoji 🇻🇳
+    public string FlagCode { get; set; }
 }
 
 public class SyncScript
@@ -390,4 +439,24 @@ public class LocationLogEntry
     public double Longitude { get; set; }
     public double? Accuracy { get; set; }
     public DateTimeOffset RecordedAt { get; set; }
+}
+
+/// <summary>
+/// DTO mobile-side cho phản hồi của endpoint /api/mobile/narration.
+/// Bao gồm cả script (để hiển thị / fallback TTS) và audioUrl (để phát trực tiếp).
+/// </summary>
+public class MobileNarrationInfo
+{
+    public string? NarrationContentId { get; set; }
+    public string? StallId { get; set; }
+    public string? LanguageId { get; set; }
+    public string? LanguageCode { get; set; }
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+    public string? ScriptText { get; set; }
+    public string? AudioUrl { get; set; }
+    public string? AudioId { get; set; }
+    public string? TtsVoiceProfileId { get; set; }
+    public bool IsTts { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
 }

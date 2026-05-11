@@ -187,18 +187,27 @@ public class LocalDbService
         var data = await apiService.GetSyncDataAsync(lastSync);
         if (data == null) return; // Offline hoặc lỗi, dùng dữ liệu cũ
 
-        // 1. Sync Languages
+        // 1. Sync Languages - bao gồm FlagCode để mobile hiển thị cờ quốc gia
+        // khi user chọn ngôn ngữ thuyết minh trên MainPage.
         foreach (var langData in data.Languages)
         {
             var existing = await _db.Table<Language>().Where(l => l.ServerId == langData.ServerId || l.LangCode == langData.Code).FirstOrDefaultAsync();
             if (existing == null)
             {
-                await _db.InsertAsync(new Language { ServerId = langData.ServerId, LangCode = langData.Code, LangName = langData.Name });
+                await _db.InsertAsync(new Language
+                {
+                    ServerId = langData.ServerId,
+                    LangCode = langData.Code,
+                    LangName = langData.Name,
+                    FlagCode = langData.FlagCode ?? string.Empty
+                });
             }
             else
             {
                 existing.ServerId = langData.ServerId;
                 existing.LangName = langData.Name;
+                if (!string.IsNullOrEmpty(langData.FlagCode))
+                    existing.FlagCode = langData.FlagCode;
                 await _db.UpdateAsync(existing);
             }
         }

@@ -35,7 +35,14 @@ namespace VinhThucAudioGuide
         public string ImageUrl { get; set; }
         public double Rating { get; set; }
         public Color PinColor { get; set; } = Colors.Red;
+
+        // Kịch bản thuyết minh theo mã ngôn ngữ (key = "vi" / "en" / ...).
+        // Nạp từ Local DB sau khi sync + bổ sung từ phản hồi geo/stalls.
         public Dictionary<string, string> AudioScripts { get; set; } = new Dictionary<string, string>();
+
+        // URL audio đã sinh sẵn theo mã ngôn ngữ. Khi geo/stalls đã trả về AudioUrl thì
+        // có thể phát ngay mà không phải gọi thêm narration endpoint.
+        public Dictionary<string, string> AudioUrls { get; set; } = new Dictionary<string, string>();
     }
 
     public partial class MainPage : ContentPage
@@ -182,6 +189,20 @@ namespace VinhThucAudioGuide
                 var stalls = await apiService.GetStallsAsync();
                 if (stalls != null && stalls.Count > 0)
                 {
+                    // Map LanguageId (Guid) -> mã ngôn ngữ ("vi"/"en"/...) để gán cho AudioScripts.
+                    // Trang web cấu hình ngôn ngữ qua DB, mobile chỉ biết qua sync.
+                    var langCodeById = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    try
+                    {
+                        var allLangs = await dbService.GetAllLanguages();
+                        foreach (var l in allLangs)
+                        {
+                            if (!string.IsNullOrEmpty(l.ServerId) && !string.IsNullOrEmpty(l.LangCode))
+                                langCodeById[l.ServerId] = l.LangCode;
+                        }
+                    }
+                    catch { }
+
                     foreach (var stall in stalls)
                     {
                         var poi = new POI
@@ -193,17 +214,36 @@ namespace VinhThucAudioGuide
                             Latitude = stall.Latitude,
                             Longitude = stall.Longitude
                         };
-                        // Nạp script âm thanh từ DB cục bộ nếu có
+
+                        // Nạp script âm thanh từ DB cục bộ nếu có (sync từ /audiocontent/sync)
                         try
                         {
                             var localLoc = await dbService.GetTourLocationByServerId(stall.StallId);
                             if (localLoc != null)
                             {
                                 poi.Id = localLoc.Id;
-                                poi.AudioScripts = await dbService.GetScriptsForLocation(localLoc.Id);
+                                var dbScripts = await dbService.GetScriptsForLocation(localLoc.Id);
+                                if (dbScripts != null)
+                                {
+                                    foreach (var kv in dbScripts)
+                                        poi.AudioScripts[kv.Key] = kv.Value;
+                                }
                             }
                         }
                         catch { }
+
+                        // Bổ sung từ phản hồi geo/stalls — đây là dữ liệu mới nhất từ web,
+                        // có cả ScriptText và AudioUrl đã sinh sẵn ở Blob Storage.
+                        var nc = stall.NarrationContent;
+                        if (nc != null && !string.IsNullOrEmpty(nc.LanguageId)
+                            && langCodeById.TryGetValue(nc.LanguageId, out var langCode))
+                        {
+                            if (!string.IsNullOrWhiteSpace(nc.ScriptText))
+                                poi.AudioScripts[langCode] = nc.ScriptText;
+                            if (!string.IsNullOrWhiteSpace(nc.AudioUrl))
+                                poi.AudioUrls[langCode] = nc.AudioUrl;
+                        }
+
                         _allPois.Add(poi);
                     }
                     loadedFromApi = true;
@@ -393,13 +433,25 @@ namespace VinhThucAudioGuide
                 return;
             }
 
-            // Hiển thị danh sách ngôn ngữ từ DB
-            string[] langNames = allLangs.Select(l => l.LangName).ToArray();
-            string action = await DisplayActionSheet("Chọn ngôn ngữ thuyết minh", "Hủy", null, langNames);
+            // Hiển thị danh sách ngôn ngữ kèm cờ quốc gia.
+            // FlagCode lấy từ Server (vd: "vn", "us", "fr") → convert sang emoji 🇻🇳/🇺🇸/🇫🇷
+            // bằng regional indicator symbols để hiển thị đa nền tảng.
+            string[] langDisplayLabels = allLangs.Select(l =>
+            {
+                var flag = BuildFlagEmoji(l.FlagCode);
+                return string.IsNullOrEmpty(flag) ? l.LangName : $"{flag} {l.LangName}";
+            }).ToArray();
+            string action = await DisplayActionSheet("Chọn ngôn ngữ thuyết minh", "Hủy", null, langDisplayLabels);
             
             if (action == "Hủy" || string.IsNullOrEmpty(action)) return;
 
-            var selectedLang = allLangs.FirstOrDefault(l => l.LangName == action);
+            // Người dùng chọn label "🇻🇳 Tiếng Việt", cần match theo LangName để lấy đúng record.
+            // Bóc cờ ở đầu (nếu có) rồi so với LangName.
+            var pickedLabel = action.TrimStart().TrimStart('\uD83C').Trim(); // bóc lead surrogate, sẽ trim space sau
+            var selectedLang = allLangs.FirstOrDefault(l =>
+                action == l.LangName ||
+                action.EndsWith(l.LangName, StringComparison.Ordinal) ||
+                action.Contains(l.LangName));
             if (selectedLang == null) return;
 
             string lang = selectedLang.LangCode;
@@ -424,32 +476,92 @@ namespace VinhThucAudioGuide
             int currentId = _speechId;
             _currentAudioPlayer?.Stop();
 
-            // ===== Nguồn 1: Server TTS API =====
+            // ===== Nguồn 1: Audio đã sinh sẵn trên Server (Blob Storage) =====
+            // Web admin đã tạo TTS audio cho từng narration content. Mobile chỉ cần
+            // lấy AudioUrl rồi download mp3 và phát. Đây là nguồn chính, ổn định, có cùng
+            // nội dung kịch bản với web.
+            try
+            {
+                string? audioUrl = null;
+                string? freshScript = null;
+
+                // 1a) Hỏi server narration info để lấy đúng audio cho ngôn ngữ + voice user chọn.
+                if (apiService != null)
+                {
+                    var info = await apiService.GetNarrationAsync(selectedPoi.ServerId, lang, selectedVoiceId);
+                    if (info != null)
+                    {
+                        audioUrl = info.AudioUrl;
+                        freshScript = info.ScriptText;
+
+                        // Lưu lại vào POI để các lần sau dùng được offline / nhanh hơn.
+                        if (!string.IsNullOrWhiteSpace(freshScript))
+                            selectedPoi.AudioScripts[lang] = freshScript;
+                        if (!string.IsNullOrWhiteSpace(audioUrl))
+                            selectedPoi.AudioUrls[lang] = audioUrl;
+                    }
+                }
+
+                // 1b) Nếu narration endpoint chưa có (server cũ chưa deploy bản mới),
+                //     thử dùng AudioUrl đã có sẵn trong cache từ /geo/stalls.
+                if (string.IsNullOrWhiteSpace(audioUrl))
+                    selectedPoi.AudioUrls.TryGetValue(lang, out audioUrl);
+
+                if (!string.IsNullOrWhiteSpace(audioUrl) && currentId == _speechId)
+                {
+                    var bytes = await Services.ApiService.DownloadAudioAsync(audioUrl);
+                    if (currentId != _speechId) return;
+                    if (bytes != null && bytes.Length > 0)
+                    {
+                        _currentAudioPlayer?.Stop();
+                        _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(bytes));
+                        _currentAudioPlayer.Play();
+
+                        // Cache best-effort cho lần phát sau khi mất mạng.
+                        _ = Services.AudioCacheService.GetOrFetchAudioAsync(selectedPoi.ServerId, lang);
+                        return;
+                    }
+                }
+
+                // 1c) Cập nhật biến text để các nguồn TTS phía dưới dùng kịch bản mới nhất.
+                if (!string.IsNullOrWhiteSpace(freshScript))
+                    text = freshScript;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Speak] Server audio failed: {ex.Message}");
+                /* Server lỗi → thử nguồn tiếp theo */
+            }
+
+            // ===== Nguồn 2: /api/mobile/tts (sinh TTS realtime nếu blob chưa có) =====
             string apiBase = Preferences.Default.Get("RemoteApiBase", string.Empty);
-            if (!string.IsNullOrWhiteSpace(apiBase) && !string.IsNullOrEmpty(selectedPoi.ServerId))
+            if (currentId == _speechId
+                && !string.IsNullOrWhiteSpace(apiBase)
+                && !string.IsNullOrEmpty(selectedPoi.ServerId))
             {
                 try
                 {
-                    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+                    using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
                     string ttsUrl = apiBase.TrimEnd('/') + $"/api/mobile/tts?stallId={selectedPoi.ServerId}&lang={lang}";
                     if (selectedVoiceId.HasValue) ttsUrl += $"&voiceId={selectedVoiceId.Value}";
 
                     var ttsBytes = await client.GetByteArrayAsync(ttsUrl);
+                    if (currentId != _speechId) return;
                     if (ttsBytes != null && ttsBytes.Length > 0)
                     {
                         _currentAudioPlayer?.Stop();
                         _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(ttsBytes));
                         _currentAudioPlayer.Play();
-
-                        // Cache best-effort
-                        _ = Services.AudioCacheService.GetOrFetchAudioAsync(selectedPoi.ServerId, lang);
                         return;
                     }
                 }
-                catch { /* Server lỗi → thử nguồn tiếp theo */ }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[Speak] /api/mobile/tts failed: {ex.Message}");
+                }
             }
 
-            // ===== Nguồn 2: Google Translate TTS =====
+            // ===== Nguồn 3: Google Translate TTS =====
             if (!string.IsNullOrWhiteSpace(text))
             {
                 bool playedFromGoogle = false;
@@ -478,7 +590,10 @@ namespace VinhThucAudioGuide
                         string cleanSentence = sentence.Trim();
                         if (string.IsNullOrEmpty(cleanSentence)) continue;
 
-                        var url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(cleanSentence)}&tl={lang}&client=tw-ob";
+                        // Google Translate TTS dùng mã ngắn ("vi", "en", "fr"...) không nhận "vi-VN".
+                        // Chuyển locale "xx-YY" → "xx" để giọng đọc đúng ngôn ngữ, tránh giọng mặc định "lơ lớ".
+                        var googleLang = lang.Contains('-') ? lang.Split('-')[0].ToLowerInvariant() : lang.ToLowerInvariant();
+                        var url = $"https://translate.google.com/translate_tts?ie=UTF-8&q={Uri.EscapeDataString(cleanSentence)}&tl={googleLang}&client=tw-ob";
                         var audioBytes = await client.GetByteArrayAsync(url);
                         if (currentId != _speechId) break;
 
@@ -497,12 +612,26 @@ namespace VinhThucAudioGuide
                 if (playedFromGoogle) return;
             }
 
-            // ===== Nguồn 3: MAUI built-in TextToSpeech (không cần DependencyService) =====
+            // ===== Nguồn 4: MAUI built-in TextToSpeech (không cần DependencyService) =====
             try
             {
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    var lmError = LocalizationManager.Instance;
+                    await DisplayAlert(lmError.AudioErrorTitle, lmError.TtsPlaybackFailedMessage, lmError.OkButton);
+                    return;
+                }
+
+                // Tách locale gốc và mã ngôn ngữ ngắn để khớp với danh sách MAUI TTS locales.
+                // Ưu tiên khớp chính xác "vi-VN", nếu không có thì khớp prefix "vi" → tránh
+                // chọn nhầm locale khác (vd ngôn ngữ tiếng Việt bị fallback về tiếng Anh).
+                var langPrefix = lang.Contains('-') ? lang.Split('-')[0] : lang;
                 var locales = await TextToSpeech.Default.GetLocalesAsync();
                 var matchedLocale = locales.FirstOrDefault(l =>
-                    l.Language.StartsWith(lang, StringComparison.OrdinalIgnoreCase));
+                        string.Equals(l.Language, lang, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals($"{l.Language}-{l.Country}", lang, StringComparison.OrdinalIgnoreCase))
+                    ?? locales.FirstOrDefault(l =>
+                        l.Language.Equals(langPrefix, StringComparison.OrdinalIgnoreCase));
 
                 await TextToSpeech.Default.SpeakAsync(text, new SpeechOptions { Locale = matchedLocale });
             }
@@ -544,7 +673,26 @@ namespace VinhThucAudioGuide
         {
             _activeCategoryFilter = "Lễ hội";
             ApplyCategoryFilter();
-        }   
+        }
+
+        // ====== Helper: chuyển FlagCode ISO-2 (vd "vn", "us", "fr") thành emoji 🇻🇳/🇺🇸/🇫🇷 ======
+        // Mỗi ký tự A-Z map vào Unicode regional indicator symbol (U+1F1E6..U+1F1FF).
+        // Ghép 2 regional indicator → trình hiển thị tự render thành emoji lá cờ.
+        // Trả về chuỗi rỗng nếu FlagCode null/quá ngắn/không phải chữ cái.
+        private static string BuildFlagEmoji(string flagCode)
+        {
+            if (string.IsNullOrWhiteSpace(flagCode) || flagCode.Length < 2)
+                return string.Empty;
+
+            char c1 = char.ToUpperInvariant(flagCode[0]);
+            char c2 = char.ToUpperInvariant(flagCode[1]);
+            if (c1 < 'A' || c1 > 'Z' || c2 < 'A' || c2 > 'Z')
+                return string.Empty;
+
+            int code1 = 0x1F1E6 + (c1 - 'A');
+            int code2 = 0x1F1E6 + (c2 - 'A');
+            return char.ConvertFromUtf32(code1) + char.ConvertFromUtf32(code2);
+        }
     }
 
 }
