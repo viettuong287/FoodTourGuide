@@ -7,19 +7,25 @@ namespace VinhThucAudioGuide.Services;
 public class ApiService
 {
     private readonly HttpClient _httpClient;
-    // CHÚ Ý QUAN TRỌNG: 
-    // 1. Dùng http://10.0.2.2:5299/api/ nếu chạy trên GIẢ LẬP (Emulator)
-    // 2. Dùng IP máy tính (VD: http://192.168.1.5:5299/api/) nếu chạy trên MÁY THẬT (Redmi 10C)
-    // Bạn hãy thay địa chỉ IP dưới đây cho đúng với IP máy tính của bạn:
-    // Địa chỉ máy chủ trên mạng (Azure)
-    private const string BaseUrl = "https://locateandmultilingualnarration-amgrfua6fbd7gnce.eastasia-01.azurewebsites.net/api/"; 
+
+    // URL Azure đang chạy thật, dùng cho release và cho mọi máy thật chưa override.
+    private const string ProductionApiBase = "https://locateandmultilingualnarration-amgrfua6fbd7gnce.eastasia-01.azurewebsites.net";
+
+    // URL API local cho emulator Android (10.0.2.2 = localhost của PC dev nhìn từ AVD).
+    private const string AndroidEmulatorApiBase = "http://10.0.2.2:5299";
+
+    // URL API local cho Windows / iOS simulator / Mac Catalyst chạy trên cùng máy dev.
+    private const string LocalhostApiBase = "http://localhost:5299";
 
     public ApiService()
     {
+        var baseUrl = GetConfiguredApiBase();
+
         _httpClient = new HttpClient
         {
-            BaseAddress = new Uri(BaseUrl),
-            Timeout = TimeSpan.FromSeconds(10)
+            BaseAddress = new Uri($"{baseUrl}/api/"),
+            // 30s để chịu được Azure cold-start (App Service sleep mất 15-25s đánh thức).
+            Timeout = TimeSpan.FromSeconds(30)
         };
     }
 
@@ -102,7 +108,7 @@ public class ApiService
             {
                 MainThread.BeginInvokeOnMainThread(async () => {
                     await splash.DisplayAlert("Lỗi kết nối", 
-                        $"Không thể gửi tín hiệu tới Server tại {BaseUrl}. Lỗi: {ex.Message}. Vui lòng kiểm tra Wifi!", "OK");
+                        $"Không thể gửi tín hiệu tới Server tại {_httpClient.BaseAddress}. Lỗi: {ex.Message}. Vui lòng kiểm tra Wifi!", "OK");
                 });
             }
         }
@@ -325,6 +331,61 @@ public class ApiService
         }
         return deviceId;
     }
+
+    /// <summary>
+    /// URL API mặc định cho thiết bị hiện tại — tự chọn theo platform + emulator/máy thật.
+    /// - Android emulator → 10.0.2.2 (loopback của PC dev nhìn từ AVD)
+    /// - Android máy thật → Azure (vì máy thật KHÔNG reach được localhost của PC qua USB)
+    /// - Windows/iOS sim → localhost (chạy chung máy dev với API)
+    /// - Release → Azure
+    /// </summary>
+    public static string DefaultApiBase
+    {
+        get
+        {
+#if !DEBUG
+            return ProductionApiBase;
+#else
+            try
+            {
+                var platform = DeviceInfo.Current.Platform;
+                var isVirtual = DeviceInfo.Current.DeviceType == DeviceType.Virtual;
+
+                if (platform == DevicePlatform.Android)
+                    return isVirtual ? AndroidEmulatorApiBase : ProductionApiBase;
+
+                if (platform == DevicePlatform.iOS)
+                    return isVirtual ? LocalhostApiBase : ProductionApiBase;
+
+                return LocalhostApiBase;
+            }
+            catch
+            {
+                return ProductionApiBase;
+            }
+#endif
+        }
+    }
+
+    public static string GetConfiguredApiBase()
+    {
+        var configured = Preferences.Default.Get("RemoteApiBase", string.Empty).TrimEnd('/');
+
+        // Khi user đã set IP LAN riêng (vd http://192.168.1.5:5299) thì luôn tôn trọng.
+        // Coi giá trị "rác" cũ (rỗng / Azure cũ / 10.0.2.2 mà máy không phải emulator)
+        // là chưa cấu hình, để rơi về DefaultApiBase phù hợp với thiết bị hiện tại.
+        if (string.IsNullOrWhiteSpace(configured))
+            return DefaultApiBase;
+
+        if (configured.Equals(AndroidEmulatorApiBase, StringComparison.OrdinalIgnoreCase)
+            && DeviceInfo.Current.Platform == DevicePlatform.Android
+            && DeviceInfo.Current.DeviceType != DeviceType.Virtual)
+        {
+            return DefaultApiBase;
+        }
+
+        return configured;
+    }
 }
 
 public class ApiResult<T>
@@ -449,7 +510,11 @@ public class MobileNarrationInfo
 {
     public string? NarrationContentId { get; set; }
     public string? StallId { get; set; }
+    // LanguageId = ngôn ngữ người dùng yêu cầu
+    // SourceLanguageId = ngôn ngữ thật sự của ScriptText (có thể là tiếng Việt gốc)
+    // Mobile dùng cặp này để biết có thể đưa ScriptText cho Google/MAUI TTS hay không.
     public string? LanguageId { get; set; }
+    public string? SourceLanguageId { get; set; }
     public string? LanguageCode { get; set; }
     public string? Title { get; set; }
     public string? Description { get; set; }

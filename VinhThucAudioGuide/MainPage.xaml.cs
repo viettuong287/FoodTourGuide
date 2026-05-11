@@ -24,7 +24,7 @@ using Color = Microsoft.Maui.Graphics.Color;
 
 namespace VinhThucAudioGuide
 {
-    public class POI
+    public class POI : INotifyPropertyChanged
     {
         public int Id { get; set; }
         public string ServerId { get; set; }
@@ -43,6 +43,22 @@ namespace VinhThucAudioGuide
         // URL audio đã sinh sẵn theo mã ngôn ngữ. Khi geo/stalls đã trả về AudioUrl thì
         // có thể phát ngay mà không phải gọi thêm narration endpoint.
         public Dictionary<string, string> AudioUrls { get; set; } = new Dictionary<string, string>();
+
+        // Trạng thái được chọn - dùng cho DataTrigger trong XAML để đổi màu card.
+        // Khi user bấm 1 POI thì IsSelected = true, bấm lại sẽ về false (toggle).
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected == value) return;
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
     }
 
     public partial class MainPage : ContentPage
@@ -347,8 +363,29 @@ namespace VinhThucAudioGuide
             var target = e.CurrentSelection.FirstOrDefault() as POI;
             if (target == null) return;
 
-            _selectedPoiForAudio = target;
+            // Clear SelectedItem ngay để: (1) tự render highlight qua IsSelected thay cho
+            // selection mặc định của CollectionView, (2) lần bấm tiếp theo lên cùng item vẫn
+            // kích hoạt SelectionChanged → cho phép logic toggle hoạt động.
             cvPoiList.SelectedItem = null;
+
+            // Toggle: nếu bấm lại đúng POI đang chọn thì bỏ chọn, xoá pin + route.
+            if (_selectedPoiForAudio == target)
+            {
+                target.IsSelected = false;
+                _selectedPoiForAudio = null;
+                mapView.Pins.Clear();
+                _routeLayer.Features = new List<IFeature>();
+                _routeLayer.DataHasChanged();
+                mapView.Refresh();
+                return;
+            }
+
+            // Bỏ chọn POI cũ (nếu có), sau đó đánh dấu POI mới đang chọn.
+            if (_selectedPoiForAudio != null)
+                _selectedPoiForAudio.IsSelected = false;
+
+            target.IsSelected = true;
+            _selectedPoiForAudio = target;
 
             mapView.Pins.Clear();
             mapView.Pins.Add(new Mapsui.UI.Maui.Pin(mapView)
@@ -446,8 +483,6 @@ namespace VinhThucAudioGuide
             if (action == "Hủy" || string.IsNullOrEmpty(action)) return;
 
             // Người dùng chọn label "🇻🇳 Tiếng Việt", cần match theo LangName để lấy đúng record.
-            // Bóc cờ ở đầu (nếu có) rồi so với LangName.
-            var pickedLabel = action.TrimStart().TrimStart('\uD83C').Trim(); // bóc lead surrogate, sẽ trim space sau
             var selectedLang = allLangs.FirstOrDefault(l =>
                 action == l.LangName ||
                 action.EndsWith(l.LangName, StringComparison.Ordinal) ||
@@ -455,7 +490,13 @@ namespace VinhThucAudioGuide
             if (selectedLang == null) return;
 
             string lang = selectedLang.LangCode;
-            string text = selectedPoi.AudioScripts.GetValueOrDefault(lang, selectedPoi.Name);
+            // Chỉ giữ kịch bản đã sync sẵn cho ĐÚNG ngôn ngữ này. Tuyệt đối không fallback sang
+            // tên POI hay script tiếng Việt cho các ngôn ngữ ngoại — đó là nguyên nhân app trước
+            // đây "đọc tên POI" thay vì phát audio đúng.
+            string text = selectedPoi.AudioScripts.GetValueOrDefault(lang, string.Empty);
+            // Đánh dấu kịch bản hiện có là KHỚP ngôn ngữ nếu nó được sync từ DB theo đúng mã ngôn ngữ.
+            // Khi gọi /api/mobile/narration, biến này sẽ được cập nhật theo SourceLanguageId từ server.
+            bool scriptMatchesLang = !string.IsNullOrWhiteSpace(text);
 
             // Bước 3: Chọn Giọng đọc (Lấy từ Server)
             var apiService = IPlatformApplication.Current?.Services.GetService<Services.ApiService>();
@@ -494,9 +535,28 @@ namespace VinhThucAudioGuide
                         audioUrl = info.AudioUrl;
                         freshScript = info.ScriptText;
 
-                        // Lưu lại vào POI để các lần sau dùng được offline / nhanh hơn.
-                        if (!string.IsNullOrWhiteSpace(freshScript))
+                        // Kịch bản ScriptText chỉ thật sự khớp ngôn ngữ khi SourceLanguageId == LanguageId,
+                        // tức server có content đúng ngôn ngữ. Nếu không (vd content gốc tiếng Việt
+                        // nhưng user chọn tiếng Anh) thì KHÔNG đưa text này cho Google/MAUI TTS,
+                        // tránh tình trạng đọc tiếng Việt bằng giọng tiếng Anh nghe lơ lớ.
+                        bool serverScriptMatches =
+                            !string.IsNullOrWhiteSpace(info.LanguageId)
+                            && !string.IsNullOrWhiteSpace(info.SourceLanguageId)
+                            && string.Equals(info.LanguageId, info.SourceLanguageId, StringComparison.OrdinalIgnoreCase);
+
+                        // Chỉ lưu/cập nhật script khi nó đúng là ngôn ngữ user chọn.
+                        if (serverScriptMatches && !string.IsNullOrWhiteSpace(freshScript))
+                        {
                             selectedPoi.AudioScripts[lang] = freshScript;
+                            text = freshScript;
+                            scriptMatchesLang = true;
+                        }
+                        else if (!serverScriptMatches)
+                        {
+                            // Server trả về script của ngôn ngữ khác → bỏ qua, đảm bảo fallback TTS không phát sai.
+                            freshScript = null;
+                        }
+
                         if (!string.IsNullOrWhiteSpace(audioUrl))
                             selectedPoi.AudioUrls[lang] = audioUrl;
                     }
@@ -522,10 +582,6 @@ namespace VinhThucAudioGuide
                         return;
                     }
                 }
-
-                // 1c) Cập nhật biến text để các nguồn TTS phía dưới dùng kịch bản mới nhất.
-                if (!string.IsNullOrWhiteSpace(freshScript))
-                    text = freshScript;
             }
             catch (Exception ex)
             {
@@ -534,7 +590,7 @@ namespace VinhThucAudioGuide
             }
 
             // ===== Nguồn 2: /api/mobile/tts (sinh TTS realtime nếu blob chưa có) =====
-            string apiBase = Preferences.Default.Get("RemoteApiBase", string.Empty);
+            string apiBase = Services.ApiService.GetConfiguredApiBase();
             if (currentId == _speechId
                 && !string.IsNullOrWhiteSpace(apiBase)
                 && !string.IsNullOrEmpty(selectedPoi.ServerId))
@@ -562,7 +618,9 @@ namespace VinhThucAudioGuide
             }
 
             // ===== Nguồn 3: Google Translate TTS =====
-            if (!string.IsNullOrWhiteSpace(text))
+            // Chỉ chạy khi text thực sự đúng ngôn ngữ user chọn — tránh đọc tiếng Việt
+            // bằng giọng nước ngoài, dẫn đến nghe "lơ lớ" / không hiểu gì.
+            if (scriptMatchesLang && !string.IsNullOrWhiteSpace(text))
             {
                 bool playedFromGoogle = false;
                 try
@@ -613,15 +671,20 @@ namespace VinhThucAudioGuide
             }
 
             // ===== Nguồn 4: MAUI built-in TextToSpeech (không cần DependencyService) =====
+            // Khi không có text đúng ngôn ngữ thì không thử MAUI TTS nữa, vì nó cũng sẽ
+            // phát sai. Thay vào đó báo cho user biết server chưa có audio cho ngôn ngữ này.
+            if (!scriptMatchesLang || string.IsNullOrWhiteSpace(text))
+            {
+                await DisplayAlert(
+                    "Chưa có thuyết minh",
+                    $"Hiện chưa có audio thuyết minh cho ngôn ngữ \"{selectedLang.LangName}\" của POI này. " +
+                    "Vui lòng tạo audio/giọng đọc trên trang quản trị web (Audio URL) rồi thử lại.",
+                    "OK");
+                return;
+            }
+
             try
             {
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    var lmError = LocalizationManager.Instance;
-                    await DisplayAlert(lmError.AudioErrorTitle, lmError.TtsPlaybackFailedMessage, lmError.OkButton);
-                    return;
-                }
-
                 // Tách locale gốc và mã ngôn ngữ ngắn để khớp với danh sách MAUI TTS locales.
                 // Ưu tiên khớp chính xác "vi-VN", nếu không có thì khớp prefix "vi" → tránh
                 // chọn nhầm locale khác (vd ngôn ngữ tiếng Việt bị fallback về tiếng Anh).

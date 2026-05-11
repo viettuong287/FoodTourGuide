@@ -21,7 +21,7 @@ namespace VinhThucAudioGuide.Services
 
                 if (File.Exists(filePath)) return filePath;
 
-                var apiBase = Preferences.Default.Get("RemoteApiBase", string.Empty);
+                var apiBase = ApiService.GetConfiguredApiBase();
                 if (string.IsNullOrWhiteSpace(apiBase)) return null;
 
                 var url = apiBase.TrimEnd('/') + $"/api/mobile/tts?stallId={stallId}&lang={langCode}";

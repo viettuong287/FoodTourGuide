@@ -69,7 +69,7 @@ public partial class SettingsPage : ContentPage
 
             // Ví dụ gọi API -> /api/mobile/locations (tùy backend), ở đây ta dùng HttpClient cơ bản
             using var client = new System.Net.Http.HttpClient();
-            var apiUrl = Preferences.Default.Get("RemoteApiBase", "https://your-web-api.example.com");
+            var apiUrl = ApiService.GetConfiguredApiBase();
             var resp = await client.GetAsync($"{apiUrl.TrimEnd('/')}/api/mobile/locations");
             if (!resp.IsSuccessStatusCode)
             {

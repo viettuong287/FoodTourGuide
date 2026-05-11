@@ -18,13 +18,17 @@ public partial class SplashPage : ContentPage
         {
             if (localDb != null && apiService != null)
             {
-                // Lưu lại BaseUrl để các thành phần khác sử dụng (như TTS)
-                Preferences.Default.Set("RemoteApiBase", "https://locateandmultilingualnarration-amgrfua6fbd7gnce.eastasia-01.azurewebsites.net");
+                // Lưu BaseUrl mặc định để các thành phần khác dùng (như /api/mobile/tts).
+                // Không ghi đè nếu máy đã cấu hình API riêng, tránh app trỏ về Azure
+                // trong khi web/API đang chạy local với audio mới cập nhật.
+                Preferences.Default.Set("RemoteApiBase", Services.ApiService.GetConfiguredApiBase());
 
                 // 1a. Kiểm tra phiên bản schema cục bộ — nếu phiên bản đã thay đổi
                 // (vd: lần đầu cài bản mới này, sau khi server xoá toàn bộ POI cũ)
                 // thì xoá DB cục bộ để app sync lại đúng dữ liệu mới, tránh hiển thị POI cũ.
-                const int LocalDbSchemaVersion = 2; // bump khi cấu trúc/POI thay đổi lớn
+                // v4: build cũ lỡ lưu script tiếng Việt vào key ngôn ngữ ngoại trong local DB,
+                // bump để xoá local cache giúp app sync lại sạch sẽ từ server.
+                const int LocalDbSchemaVersion = 4;
                 int storedVersion = Preferences.Default.Get("LocalDbSchemaVersion", 0);
                 if (storedVersion < LocalDbSchemaVersion)
                 {
