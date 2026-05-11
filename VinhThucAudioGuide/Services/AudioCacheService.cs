@@ -9,21 +9,22 @@ namespace VinhThucAudioGuide.Services
     public static class AudioCacheService
     {
         // Returns local file path if cached or downloaded successfully; null on failure
-        public static async Task<string> GetOrFetchAudioAsync(int locationId, string langCode)
+        public static async Task<string> GetOrFetchAudioAsync(string stallId, string langCode)
         {
             try
             {
+                if (string.IsNullOrEmpty(stallId)) return null;
                 var cacheDir = FileSystem.CacheDirectory;
-                var fileName = $"tts_{locationId}_{langCode}.mp3";
+                var safeId = stallId.Replace("-", "");
+                var fileName = $"tts_{safeId}_{langCode}.mp3";
                 var filePath = Path.Combine(cacheDir, fileName);
 
                 if (File.Exists(filePath)) return filePath;
 
-                // Build remote URL from preferences
                 var apiBase = Preferences.Default.Get("RemoteApiBase", string.Empty);
                 if (string.IsNullOrWhiteSpace(apiBase)) return null;
 
-                var url = apiBase.TrimEnd('/') + $"/api/mobile/tts?locationId={locationId}&lang={langCode}";
+                var url = apiBase.TrimEnd('/') + $"/api/mobile/tts?stallId={stallId}&lang={langCode}";
 
                 using var client = new HttpClient();
                 var resp = await client.GetAsync(url);

@@ -124,6 +124,12 @@ public class LocalDbService
         return script;
     }
 
+    public async Task<TourLocation> GetTourLocationByServerId(string serverId)
+    {
+        await Init();
+        return await _db.Table<TourLocation>().Where(t => t.ServerId == serverId).FirstOrDefaultAsync();
+    }
+
     public async Task<List<TourLocation>> GetAllTourLocations()
     {
         await Init();

@@ -1,14 +1,18 @@
-using Microsoft.Maui;           // Trị lỗi Easing
-using Microsoft.Maui.Controls;  // Trị lỗi ContentPage, BoxView, Slider
-using Microsoft.Maui.Storage;   // Trị lỗi Preferences
+using Microsoft.Maui;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Storage;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
+using VinhThucAudioGuide.Services;
 
 namespace VinhThucAudioGuide;
 
 public partial class SettingsPage : ContentPage
 {
     bool isProcessing = false;
+    private List<ActiveLanguage> _serverLanguages = [];
 
     public SettingsPage()
     {
@@ -16,11 +20,23 @@ public partial class SettingsPage : ContentPage
         LoadSettings(); // Tải lại cài đặt cũ khi mở app
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         LocalizationManager.Instance.PropertyChanged += OnLocalizationChanged;
         UpdateUI();
+        await LoadLanguagesFromServerAsync();
+    }
+
+    private async Task LoadLanguagesFromServerAsync()
+    {
+        var apiService = IPlatformApplication.Current?.Services.GetService<ApiService>();
+        if (apiService != null)
+        {
+            var langs = await apiService.GetActiveLanguagesAsync();
+            if (langs != null && langs.Count > 0)
+                _serverLanguages = langs;
+        }
     }
 
     protected override void OnDisappearing()
@@ -96,14 +112,31 @@ public partial class SettingsPage : ContentPage
         UpdateUI();
     }
 
-    private void OnSaveClicked(object sender, EventArgs e)
+    private async void OnSaveClicked(object sender, EventArgs e)
     {
         Preferences.Default.Set("AppLang", LocalizationManager.Instance.CurrentLanguage);
         Preferences.Default.Set("AutoPlay", SwAutoPlay.IsToggled);
         Preferences.Default.Set("VoiceSpeed", SldSpeed.Value);
 
+        // Gửi cấu hình lên Server với languageId từ API
+        var apiService = IPlatformApplication.Current?.Services.GetService<ApiService>();
+        if (apiService != null)
+        {
+            string langCode = LocalizationManager.Instance.CurrentLanguage switch
+            {
+                "English" => "en",
+                "Français" => "fr",
+                "中文" => "zh",
+                "한국어" => "ko",
+                _ => "vi"
+            };
+            var serverLang = _serverLanguages.FirstOrDefault(l => l.Code == langCode);
+            string languageId = serverLang?.Id ?? Guid.Empty.ToString();
+            await apiService.SendHeartbeatAsync(languageId, SwAutoPlay.IsToggled, SldSpeed.Value);
+        }
+
         var lm = LocalizationManager.Instance;
-        DisplayAlert(lm.SuccessTitle, lm.SaveSuccessMessage, lm.OkButton);
+        await DisplayAlert(lm.SuccessTitle, lm.SaveSuccessMessage, lm.OkButton);
     }
 
     private void OnSldSpeedChanged(object sender, ValueChangedEventArgs e)

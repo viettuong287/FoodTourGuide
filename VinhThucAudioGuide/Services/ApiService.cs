@@ -68,7 +68,7 @@ public class ApiService
     /// <summary>
     /// Gửi tín hiệu Heartbeat để Server biết thiết bị vẫn đang online (thời gian thực)
     /// </summary>
-    public async Task SendHeartbeatAsync(string languageId = null)
+    public async Task SendHeartbeatAsync(string languageId = null, bool? autoPlay = null, double? speechRate = null)
     {
         try
         {
@@ -76,11 +76,8 @@ public class ApiService
 
             var deviceId = GetOrCreateDeviceId();
 
-            // Lấy languageId mặc định nếu không truyền vào
             if (string.IsNullOrEmpty(languageId))
-            {
                 languageId = Guid.Empty.ToString();
-            }
 
             var deviceDto = new
             {
@@ -90,8 +87,8 @@ public class ApiService
                 DeviceModel = DeviceInfo.Current.Model,
                 Manufacturer = DeviceInfo.Current.Manufacturer,
                 OsVersion = DeviceInfo.Current.VersionString,
-                SpeechRate = 1.0,
-                AutoPlay = true
+                SpeechRate = speechRate ?? Preferences.Default.Get("VoiceSpeed", 1.0),
+                AutoPlay = autoPlay ?? Preferences.Default.Get("AutoPlay", true)
             };
 
             var response = await _httpClient.PostAsJsonAsync("device-preference", deviceDto);
@@ -170,6 +167,107 @@ public class ApiService
         return new();
     }
 
+    /// <summary>
+    /// Xác thực mã QR vé tham quan qua Server
+    /// </summary>
+    public async Task<QrVerifyData> VerifyQrCodeAsync(string code)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return null;
+            var body = new { code };
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = await _httpClient.PostAsJsonAsync("qrcodes/verify", body);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResult<QrVerifyData>>(options);
+                return result?.Data;
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"[VerifyQR] {ex.Message}"); }
+        return null;
+    }
+
+    /// <summary>
+    /// Lấy danh sách ngôn ngữ đang active từ Server
+    /// </summary>
+    public async Task<List<ActiveLanguage>> GetActiveLanguagesAsync()
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return new();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = await _httpClient.GetAsync("languages/active");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResult<List<ActiveLanguage>>>(options);
+                return result?.Data ?? new();
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"[Languages] {ex.Message}"); }
+        return new();
+    }
+
+    /// <summary>
+    /// Lấy cấu hình thiết bị đã lưu trên Server
+    /// </summary>
+    public async Task<DevicePreference> GetDevicePreferenceAsync()
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return null;
+            var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
+            if (string.IsNullOrEmpty(deviceId)) return null;
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = await _httpClient.GetAsync($"device-preference/{deviceId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResult<DevicePreference>>(options);
+                return result?.Data;
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"[DevicePref] {ex.Message}"); }
+        return null;
+    }
+
+    /// <summary>
+    /// Lấy danh sách gian hàng (stalls) cho bản đồ
+    /// </summary>
+    public async Task<List<StallData>> GetStallsAsync()
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return null;
+            var deviceId = GetOrCreateDeviceId();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = await _httpClient.GetAsync($"geo/stalls?deviceId={deviceId}");
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ApiResult<List<StallData>>>(options);
+                return result?.Data;
+            }
+        }
+        catch (Exception ex) { Console.WriteLine($"[Stalls] {ex.Message}"); }
+        return null;
+    }
+
+    /// <summary>
+    /// Gửi batch tọa độ GPS lên Server mỗi 20 giây
+    /// </summary>
+    public async Task SendLocationBatchAsync(List<LocationLogEntry> logs)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return;
+            if (logs == null || logs.Count == 0) return;
+            var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
+            if (string.IsNullOrEmpty(deviceId)) return;
+            var body = new { deviceId, logs };
+            await _httpClient.PostAsJsonAsync("device-location-log/batch", body);
+        }
+        catch (Exception ex) { Console.WriteLine($"[LocationBatch] {ex.Message}"); }
+    }
+
     private string GetOrCreateDeviceId()
     {
         var deviceId = Preferences.Default.Get("UniqueDeviceId", string.Empty);
@@ -229,4 +327,67 @@ public class SyncScript
     public string Title { get; set; }
     public string Content { get; set; }
     public bool IsActive { get; set; }
+}
+
+public class QrVerifyData
+{
+    public bool IsValid { get; set; }
+    public string Message { get; set; }
+    public DateTimeOffset? ExpiryAt { get; set; }
+}
+
+public class ActiveLanguage
+{
+    public string Id { get; set; }
+    public string Code { get; set; }
+    public string Name { get; set; }
+    public string DisplayName { get; set; }
+    public string FlagCode { get; set; }
+    public bool IsActive { get; set; }
+}
+
+public class DevicePreference
+{
+    public string LanguageId { get; set; }
+    public string VoiceId { get; set; }
+    public double SpeechRate { get; set; }
+    public bool AutoPlay { get; set; }
+    public string LanguageCode { get; set; }
+    public string LanguageName { get; set; }
+}
+
+public class StallData
+{
+    public string StallId { get; set; }
+    public string StallName { get; set; }
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public double RadiusMeters { get; set; }
+    public StallNarration NarrationContent { get; set; }
+    public List<StallImage> MediaImages { get; set; } = [];
+}
+
+public class StallNarration
+{
+    public string Id { get; set; }
+    public string LanguageId { get; set; }
+    public string Title { get; set; }
+    public string Description { get; set; }
+    public string ScriptText { get; set; }
+    public string AudioUrl { get; set; }
+}
+
+public class StallImage
+{
+    public string Url { get; set; }
+    public string Caption { get; set; }
+    public bool HasCaption { get; set; }
+}
+
+public class LocationLogEntry
+{
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public double? Accuracy { get; set; }
+    public DateTimeOffset RecordedAt { get; set; }
 }
