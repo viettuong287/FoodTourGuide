@@ -39,20 +39,28 @@ public class LocalizationManager : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Đặt ngôn ngữ UI theo language code chuẩn (vi/en/fr/zh/ko/...).
-    /// Dùng thay cho việc gán CurrentLanguage trực tiếp vì server có thể trả DisplayName
-    /// không khớp (vd "Vietnamese" thay vì "Tiếng Việt") khiến UI fallback về VI.
+    /// Đặt ngôn ngữ UI theo language code chuẩn từ server.
+    /// Nếu code không được map ở đây, các property localized sẽ rơi về tiếng Việt,
+    /// nên mọi ngôn ngữ thuyết minh active trên web cần có mapping tương ứng.
     /// </summary>
     public void SetLanguageByCode(string code)
     {
         if (string.IsNullOrWhiteSpace(code)) return;
-        var lower = code.ToLowerInvariant();
+        var lower = code.Trim().ToLowerInvariant();
         CurrentLanguage = lower switch
         {
+            "vi" or "vi-vn" or "vietnamese" or "tieng viet" or "tiếng việt" => "Tiếng Việt",
             "en" or "en-us" or "en-gb" => "English",
             "fr" or "fr-fr" => "Français",
             "zh" or "zh-cn" or "zh-tw" or "zh-hans" or "zh-hant" => "中文",
             "ko" or "ko-kr" => "한국어",
+            "id" or "id-id" or "in" or "indonesian" or "bahasa indonesia" => "Bahasa Indonesia",
+            "de" or "de-de" or "german" or "deutsch" => "Deutsch",
+            "it" or "it-it" or "italian" or "italiano" => "Italiano",
+            "ja" or "ja-jp" or "jp" or "japanese" or "japan" => "日本語",
+            "ru" or "ru-ru" or "russian" => "Русский",
+            "es" or "es-es" or "es-mx" or "spanish" or "espanol" or "español" => "Español",
+            "th" or "th-th" or "thai" => "ไทย",
             _ => "Tiếng Việt"
         };
     }
@@ -70,129 +78,149 @@ public class LocalizationManager : INotifyPropertyChanged
             "zh" or "zh-cn" or "zh-hans" => "🇨🇳",
             "zh-tw" or "zh-hant" => "🇹🇼",
             "ko" or "ko-kr" => "🇰🇷",
+            "id" or "id-id" or "in" => "🇮🇩",
+            "de" or "de-de" => "🇩🇪",
+            "it" or "it-it" => "🇮🇹",
+            "ja" or "ja-jp" or "jp" => "🇯🇵",
+            "ru" or "ru-ru" => "🇷🇺",
+            "es" or "es-es" or "es-mx" => "🇪🇸",
+            "th" or "th-th" => "🇹🇭",
             "vi" or "vi-vn" => "🇻🇳",
             _ => "🌐"
         };
     }
 
-    // --- KỊCH BẢN THUYẾT MINH 5 THỨ TIẾNG ---
-    public string AudioScript => CurrentLanguage switch
-    {
-        "English" => "Welcome to Ho Chi Minh City. Explore the vibrant culture, historic landmarks, and iconic streets of this dynamic metropolis.",
-        "Français" => "Bienvenue à Hô-Chi-Minh-Ville. Explorez la culture vibrante, les sites historiques et les rues emblématiques de cette métropole dynamique.",
-        "中文" => "欢迎来到胡志明市。探索这座充满活力的大都市的文化、历史地标和标志性街道。",
-        "한국어" => "호치민 시에 오신 것을 환영합니다. 이 활기찬 도시의 문화, 역사적 명소, 상징적인 거리를 탐험하세요.",
-        _ => "Chào mừng đến với Thành phố Hồ Chí Minh. Hãy khám phá văn hóa sôi động, di tích lịch sử và những con phố nổi tiếng của thành phố năng động này."
-    };
+    /// <summary>
+    /// Chọn text theo CurrentLanguage. Các ngôn ngữ mới nếu thiếu chuỗi riêng sẽ fallback English,
+    /// tuyệt đối không rơi về tiếng Việt sau khi user đã chọn ngôn ngữ khác.
+    /// </summary>
+    private string Pick(
+        string vi,
+        string en,
+        string? fr = null,
+        string? zh = null,
+        string? ko = null,
+        string? id = null,
+        string? de = null,
+        string? it = null,
+        string? ja = null,
+        string? ru = null,
+        string? es = null,
+        string? th = null)
+        => CurrentLanguage switch
+        {
+            "English" => en,
+            "Français" => fr ?? en,
+            "中文" => zh ?? en,
+            "한국어" => ko ?? en,
+            "Bahasa Indonesia" => id ?? en,
+            "Deutsch" => de ?? en,
+            "Italiano" => it ?? en,
+            "日本語" => ja ?? en,
+            "Русский" => ru ?? en,
+            "Español" => es ?? en,
+            "ไทย" => th ?? en,
+            _ => vi
+        };
 
-    // --- HOME ---
-    public string AppTitle => CurrentLanguage switch { "English" => "Ho Chi Minh City Guide", "Français" => "Guide Hô-Chi-Minh", "中文" => "胡志明市导览", "한국어" => "호치민 시 가이드", _ => "Audio Guide Thành phố Hồ Chí Minh" };
-    public string WelcomeText => CurrentLanguage switch { "English" => "Explore the vibrant streets, rich history and iconic landmarks of Ho Chi Minh City.", "Français" => "Découvrez les rues animées, l'histoire riche et les sites emblématiques de Hô-Chi-Minh-Ville.", "中文" => "探索胡志明市充满活力的街道、丰富的历史和标志性景点。", "한국어" => "호치민 시의 활기찬 거리, 풍부한 역사, 상징적인 명소를 탐험하세요.", _ => "Khám phá những con phố sôi động, lịch sử phong phú và các địa danh nổi tiếng của Thành phố Hồ Chí Minh." };
-    public string StartButton => CurrentLanguage switch { "English" => "EXPLORE THE CITY", "Français" => "EXPLORER LA VILLE", "中文" => "探索城市", "한국어" => "도시 탐험하기", _ => "KHÁM PHÁ THÀNH PHỐ" };
+    // --- KỊCH BẢN / HOME ---
+    public string AudioScript => Pick("Chào mừng đến với Thành phố Hồ Chí Minh. Hãy khám phá văn hóa sôi động, di tích lịch sử và những con phố nổi tiếng của thành phố năng động này.", "Welcome to Ho Chi Minh City. Explore the vibrant culture, historic landmarks, and iconic streets of this dynamic metropolis.", "Bienvenue à Hô-Chi-Minh-Ville. Explorez la culture vibrante, les sites historiques et les rues emblématiques de cette métropole dynamique.", "欢迎来到胡志明市。探索这座充满活力的大都市的文化、历史地标和标志性街道。", "호치민 시에 오신 것을 환영합니다. 이 활기찬 도시의 문화, 역사적 명소, 상징적인 거리를 탐험하세요.", "Selamat datang di Kota Ho Chi Minh. Jelajahi budaya yang hidup, tempat bersejarah, dan jalan-jalan ikonik kota ini.", "Willkommen in Ho-Chi-Minh-Stadt. Entdecken Sie die lebendige Kultur, historischen Orte und bekannten Straßen.", "Benvenuto a Ho Chi Minh City. Scopri la cultura vivace, i luoghi storici e le strade iconiche.", "ホーチミン市へようこそ。活気ある文化、歴史的名所、象徴的な通りを探索しましょう。", "Добро пожаловать в Хошимин. Откройте для себя яркую культуру, исторические места и знаменитые улицы.", "Bienvenido a Ciudad Ho Chi Minh. Explora su cultura vibrante, lugares históricos y calles icónicas.", "ยินดีต้อนรับสู่โฮจิมินห์ซิตี้ สำรวจวัฒนธรรมที่มีชีวิตชีวา สถานที่ทางประวัติศาสตร์ และถนนสำคัญของเมืองนี้");
+    public string AppTitle => Pick("Audio Guide Thành phố Hồ Chí Minh", "Ho Chi Minh City Guide", "Guide Hô-Chi-Minh", "胡志明市导览", "호치민 시 가이드", "Panduan Kota Ho Chi Minh", "Ho-Chi-Minh-Stadt Guide", "Guida di Ho Chi Minh", "ホーチミン市ガイド", "Гид по Хошимину", "Guía de Ho Chi Minh", "คู่มือเมืองโฮจิมินห์");
+    public string WelcomeText => Pick("Khám phá những con phố sôi động, lịch sử phong phú và các địa danh nổi tiếng của Thành phố Hồ Chí Minh.", "Explore the vibrant streets, rich history and iconic landmarks of Ho Chi Minh City.", "Découvrez les rues animées, l'histoire riche et les sites emblématiques de Hô-Chi-Minh-Ville.", "探索胡志明市充满活力的街道、丰富的历史和标志性景点。", "호치민 시의 활기찬 거리, 풍부한 역사, 상징적인 명소를 탐험하세요.", "Jelajahi jalan yang hidup, sejarah yang kaya, dan ikon Kota Ho Chi Minh.", "Entdecken Sie die lebhaften Straßen, die reiche Geschichte und die Wahrzeichen von Ho-Chi-Minh-Stadt.", "Scopri le strade vivaci, la ricca storia e i luoghi simbolo di Ho Chi Minh.", "ホーチミン市の活気ある通り、豊かな歴史、名所を探索しましょう。", "Исследуйте оживленные улицы, богатую историю и знаковые места Хошимина.", "Explora las calles vibrantes, la rica historia y los lugares emblemáticos de Ho Chi Minh.", "สำรวจถนนที่คึกคัก ประวัติศาสตร์อันยาวนาน และแลนด์มาร์กของโฮจิมินห์ซิตี้");
+    public string StartButton => Pick("KHÁM PHÁ THÀNH PHỐ", "EXPLORE THE CITY", "EXPLORER LA VILLE", "探索城市", "도시 탐험하기", "JELAJAHI KOTA", "STADT ENTDECKEN", "ESPLORA LA CITTÀ", "街を探索", "ИССЛЕДОВАТЬ ГОРОД", "EXPLORAR LA CIUDAD", "สำรวจเมือง");
 
     // --- SETTINGS ---
-    public string SettingsTitle => CurrentLanguage switch { "English" => "SETTINGS", "Français" => "PARAMÈTRES", "中文" => "设置", "한국어" => "설정", _ => "CÀI ĐẶT" };
-    public string LanguageLabel => CurrentLanguage switch { "English" => "App Language", "Français" => "Langue de l'application", "中文" => "应用语言", "한국어" => "앱 언어", _ => "Ngôn ngữ ứng dụng" };
-    public string AutoPlayLabel => CurrentLanguage switch { "English" => "Auto-play Audio", "Français" => "Lecture automatique", "中文" => "自动播放语音", "한국어" => "자동 재생", _ => "Tự động phát âm thanh" };
-    public string VoiceSpeedLabel => CurrentLanguage switch { "English" => "Voice Speed", "Français" => "Vitesse de la voix", "中文" => "语音语速", "한국어" => "음성 속도", _ => "Tốc độ đọc" };
-    public string SaveButton => CurrentLanguage switch { "English" => "SAVE CHANGES", "Français" => "ENREGISTRER", "中文" => "保存更改", "한국어" => "저장", _ => "LƯU THAY ĐỔI" };
-    public string CheckUpdateButton => CurrentLanguage switch { "English" => "Check for updates", "Français" => "Vérifier les mises à jour", "中文" => "检查更新", "한국어" => "업데이트 확인", _ => "Cập nhật mới" };
-    public string UpdatingButton => CurrentLanguage switch { "English" => "Checking...", "Français" => "Vérification...", "中文" => "检查中...", "한국어" => "확인 중...", _ => "Đang kiểm tra..." };
-    public string GroupLanguage => CurrentLanguage switch { "English" => "LANGUAGE", "Français" => "LANGUE", "中文" => "语言", "한국어" => "언어", _ => "NGÔN NGỮ" };
-    public string GroupAudio => CurrentLanguage switch { "English" => "AUDIO & NARRATION", "Français" => "AUDIO & NARRATION", "中文" => "音频和讲解", "한국어" => "오디오 및 내레이션", _ => "ÂM THANH & THUYẾT MINH" };
-    public string ChooseLanguageTitle => CurrentLanguage switch { "English" => "Choose language", "Français" => "Choisir la langue", "中文" => "选择语言", "한국어" => "언어 선택", _ => "Chọn ngôn ngữ" };
-    public string SaveSuccessMessage => CurrentLanguage switch { "English" => "Settings saved successfully!", "Français" => "Paramètres enregistrés avec succès!", "中文" => "设置已保存！", "한국어" => "설정이 저장되었습니다!", _ => "Lưu cài đặt thành công!" };
-    public string UpdateSuccessMessage(int added) => CurrentLanguage switch
-    {
-        "English" => $"Sync completed. Added {added} new places.",
-        "Français" => $"Synchronisation terminée. {added} nouveaux lieux ajoutés.",
-        "中文" => $"同步完成。已新增 {added} 个地点。",
-        "한국어" => $"동기화 완료. 새 장소 {added}개가 추가되었습니다.",
-        _ => $"Đã đồng bộ xong. Thêm {added} địa điểm mới."
-    };
-    public string ErrorTitle => CurrentLanguage switch { "English" => "Error", "Français" => "Erreur", "中文" => "错误", "한국어" => "오류", _ => "Lỗi" };
-    public string SuccessTitle => CurrentLanguage switch { "English" => "Success", "Français" => "Succès", "中文" => "成功", "한국어" => "성공", _ => "Thành công" };
-    public string UpdateTitle => CurrentLanguage switch { "English" => "Update", "Français" => "Mise à jour", "中文" => "更新", "한국어" => "업데이트", _ => "Cập nhật" };
-    public string OkButton => CurrentLanguage switch { "English" => "OK", "Français" => "OK", "中文" => "确定", "한국어" => "확인", _ => "OK" };
+    public string SettingsTitle => Pick("CÀI ĐẶT", "SETTINGS", "PARAMÈTRES", "设置", "설정", "PENGATURAN", "EINSTELLUNGEN", "IMPOSTAZIONI", "設定", "НАСТРОЙКИ", "AJUSTES", "การตั้งค่า");
+    public string LanguageLabel => Pick("Ngôn ngữ ứng dụng", "App Language", "Langue de l'application", "应用语言", "앱 언어", "Bahasa Aplikasi", "App-Sprache", "Lingua app", "アプリの言語", "Язык приложения", "Idioma de la app", "ภาษาแอป");
+    public string AutoPlayLabel => Pick("Tự động phát âm thanh", "Auto-play Audio", "Lecture automatique", "自动播放语音", "자동 재생", "Putar audio otomatis", "Audio automatisch abspielen", "Riproduzione automatica", "音声の自動再生", "Автовоспроизведение", "Reproducción automática", "เล่นเสียงอัตโนมัติ");
+    public string VoiceSpeedLabel => Pick("Tốc độ đọc", "Voice Speed", "Vitesse de la voix", "语音语速", "음성 속도", "Kecepatan suara", "Sprechgeschwindigkeit", "Velocità voce", "音声速度", "Скорость речи", "Velocidad de voz", "ความเร็วเสียง");
+    public string SaveButton => Pick("LƯU THAY ĐỔI", "SAVE CHANGES", "ENREGISTRER", "保存更改", "저장", "SIMPAN", "SPEICHERN", "SALVA", "保存", "СОХРАНИТЬ", "GUARDAR", "บันทึก");
+    public string CheckUpdateButton => Pick("Cập nhật mới", "Check for updates", "Vérifier les mises à jour", "检查更新", "업데이트 확인", "Periksa pembaruan", "Nach Updates suchen", "Controlla aggiornamenti", "更新を確認", "Проверить обновления", "Buscar actualizaciones", "ตรวจสอบอัปเดต");
+    public string UpdatingButton => Pick("Đang kiểm tra...", "Checking...", "Vérification...", "检查中...", "확인 중...", "Memeriksa...", "Prüfen...", "Controllo...", "確認中...", "Проверка...", "Comprobando...", "กำลังตรวจสอบ...");
+    public string GroupLanguage => Pick("NGÔN NGỮ", "LANGUAGE", "LANGUE", "语言", "언어", "BAHASA", "SPRACHE", "LINGUA", "言語", "ЯЗЫК", "IDIOMA", "ภาษา");
+    public string GroupAudio => Pick("ÂM THANH & THUYẾT MINH", "AUDIO & NARRATION", "AUDIO & NARRATION", "音频和讲解", "오디오 및 내레이션", "AUDIO & NARASI", "AUDIO & ERZÄHLUNG", "AUDIO E NARRAZIONE", "音声とナレーション", "АУДИО И РАССКАЗ", "AUDIO Y NARRACIÓN", "เสียงและคำบรรยาย");
+    public string ChooseLanguageTitle => Pick("Chọn ngôn ngữ", "Choose language", "Choisir la langue", "选择语言", "언어 선택", "Pilih bahasa", "Sprache wählen", "Scegli lingua", "言語を選択", "Выберите язык", "Elegir idioma", "เลือกภาษา");
+    public string SaveSuccessMessage => Pick("Lưu cài đặt thành công!", "Settings saved successfully!", "Paramètres enregistrés avec succès!", "设置已保存！", "설정이 저장되었습니다!", "Pengaturan berhasil disimpan!", "Einstellungen gespeichert!", "Impostazioni salvate!", "設定を保存しました！", "Настройки сохранены!", "¡Ajustes guardados!", "บันทึกการตั้งค่าแล้ว!");
+    public string UpdateSuccessMessage(int added) => Pick($"Đã đồng bộ xong. Thêm {added} địa điểm mới.", $"Sync completed. Added {added} new places.", $"Synchronisation terminée. {added} nouveaux lieux ajoutés.", $"同步完成。已新增 {added} 个地点。", $"동기화 완료. 새 장소 {added}개가 추가되었습니다.", $"Sinkron selesai. Menambahkan {added} tempat baru.", $"Synchronisierung abgeschlossen. {added} neue Orte hinzugefügt.", $"Sincronizzazione completata. Aggiunti {added} nuovi luoghi.", $"同期完了。新しい場所を{added}件追加しました。", $"Синхронизация завершена. Добавлено мест: {added}.", $"Sincronización completada. Se agregaron {added} lugares.", $"ซิงค์เสร็จแล้ว เพิ่มสถานที่ใหม่ {added} แห่ง");
+    public string ErrorTitle => Pick("Lỗi", "Error", "Erreur", "错误", "오류", "Kesalahan", "Fehler", "Errore", "エラー", "Ошибка", "Error", "ข้อผิดพลาด");
+    public string SuccessTitle => Pick("Thành công", "Success", "Succès", "成功", "성공", "Berhasil", "Erfolg", "Successo", "成功", "Успешно", "Éxito", "สำเร็จ");
+    public string UpdateTitle => Pick("Cập nhật", "Update", "Mise à jour", "更新", "업데이트", "Pembaruan", "Update", "Aggiornamento", "更新", "Обновление", "Actualización", "อัปเดต");
+    public string OkButton => Pick("OK", "OK", "OK", "确定", "확인", "OK", "OK", "OK", "OK", "OK", "OK", "ตกลง");
 
     // --- ONBOARDING (chọn ngôn ngữ + giọng đọc) ---
-    public string OnboardingLanguageTitle => CurrentLanguage switch { "English" => "Choose narration language", "Français" => "Choisir la langue de narration", "中文" => "选择讲解语言", "한국어" => "내레이션 언어 선택", _ => "Chọn ngôn ngữ thuyết minh" };
-    public string OnboardingLanguageSubtitle => CurrentLanguage switch { "English" => "Pick the language you want to hear. Next you will choose a voice.", "Français" => "Choisissez la langue à écouter. Vous choisirez ensuite une voix.", "中文" => "选择你想要听的语言。下一步将选择朗读声音。", "한국어" => "원하는 언어를 선택하세요. 다음 단계에서 음성을 선택합니다.", _ => "Hãy chọn ngôn ngữ bạn muốn nghe. Bước sau bạn sẽ chọn giọng đọc." };
-    public string OnboardingVoiceTitle => CurrentLanguage switch { "English" => "Choose a voice", "Français" => "Choisir une voix", "中文" => "选择朗读声音", "한국어" => "음성 선택", _ => "Chọn giọng đọc" };
-    public string OnboardingVoiceDefaultLabel => CurrentLanguage switch { "English" => "Default", "Français" => "Par défaut", "中文" => "默认", "한국어" => "기본", _ => "Mặc định" };
-    public string OnboardingVoiceSubtitle => CurrentLanguage switch { "English" => "Voice", "Français" => "Voix", "中文" => "声音", "한국어" => "음성", _ => "Giọng đọc" };
-    public string OnboardingSkipVoiceButton => CurrentLanguage switch { "English" => "Skip, use default voice", "Français" => "Passer, utiliser la voix par défaut", "中文" => "跳过，使用默认声音", "한국어" => "건너뛰기, 기본 음성 사용", _ => "Bỏ qua, dùng giọng mặc định" };
-    public string OnboardingRetryButton => CurrentLanguage switch { "English" => "Retry", "Français" => "Réessayer", "中文" => "重试", "한국어" => "다시 시도", _ => "Tải lại" };
-    public string OnboardingNoLanguages => CurrentLanguage switch { "English" => "Could not load language list.", "Français" => "Impossible de charger la liste des langues.", "中文" => "无法加载语言列表。", "한국어" => "언어 목록을 불러올 수 없습니다.", _ => "Không tải được danh sách ngôn ngữ." };
-    public string OnboardingCheckNetwork => CurrentLanguage switch { "English" => "Check your network connection and try again.", "Français" => "Vérifiez votre connexion réseau et réessayez.", "中文" => "请检查网络连接后重试。", "한국어" => "네트워크 연결을 확인하고 다시 시도하세요.", _ => "Kiểm tra kết nối mạng và thử lại." };
-    public string OnboardingNoVoices => CurrentLanguage switch { "English" => "No voices available for this language.", "Français" => "Aucune voix disponible pour cette langue.", "中文" => "该语言暂无可用声音。", "한국어" => "이 언어에 사용할 수 있는 음성이 없습니다.", _ => "Chưa có giọng đọc cho ngôn ngữ này." };
-    public string OnboardingSkipHint => CurrentLanguage switch { "English" => "Tap Skip to use the default voice.", "Français" => "Touchez Passer pour utiliser la voix par défaut.", "中文" => "点击“跳过”使用默认声音。", "한국어" => "기본 음성을 사용하려면 건너뛰기를 누르세요.", _ => "Bấm Bỏ qua để dùng giọng mặc định." };
-    public string OnboardingSaving => CurrentLanguage switch { "English" => "Saving your choice...", "Français" => "Enregistrement de votre choix...", "中文" => "正在保存选择...", "한국어" => "선택 저장 중...", _ => "Đang lưu lựa chọn..." };
+    public string OnboardingLanguageTitle => Pick("Chọn ngôn ngữ thuyết minh", "Choose narration language", "Choisir la langue de narration", "选择讲解语言", "내레이션 언어 선택", "Pilih bahasa narasi", "Sprache der Führung wählen", "Scegli lingua narrazione", "ナレーション言語を選択", "Выберите язык аудиогида", "Elige idioma de narración", "เลือกภาษาคำบรรยาย");
+    public string OnboardingLanguageSubtitle => Pick("Hãy chọn ngôn ngữ bạn muốn nghe. Bước sau bạn sẽ chọn giọng đọc.", "Pick the language you want to hear. Next you will choose a voice.", "Choisissez la langue à écouter. Vous choisirez ensuite une voix.", "选择你想要听的语言。下一步将选择朗读声音。", "원하는 언어를 선택하세요. 다음 단계에서 음성을 선택합니다.", "Pilih bahasa yang ingin Anda dengar. Berikutnya pilih suara.", "Wählen Sie die gewünschte Sprache. Danach wählen Sie eine Stimme.", "Scegli la lingua da ascoltare. Poi sceglierai una voce.", "聞きたい言語を選択してください。次に音声を選択します。", "Выберите язык, который хотите слушать. Затем выберите голос.", "Elige el idioma que quieres escuchar. Luego elegirás una voz.", "เลือกภาษาที่ต้องการฟัง จากนั้นเลือกเสียง");
+    public string OnboardingVoiceTitle => Pick("Chọn giọng đọc", "Choose a voice", "Choisir une voix", "选择朗读声音", "음성 선택", "Pilih suara", "Stimme wählen", "Scegli voce", "音声を選択", "Выберите голос", "Elegir voz", "เลือกเสียง");
+    public string OnboardingVoiceDefaultLabel => Pick("Mặc định", "Default", "Par défaut", "默认", "기본", "Default", "Standard", "Predefinito", "既定", "По умолчанию", "Predeterminado", "ค่าเริ่มต้น");
+    public string OnboardingVoiceSubtitle => Pick("Giọng đọc", "Voice", "Voix", "声音", "음성", "Suara", "Stimme", "Voce", "音声", "Голос", "Voz", "เสียง");
+    public string OnboardingSkipVoiceButton => Pick("Bỏ qua, dùng giọng mặc định", "Skip, use default voice", "Passer, utiliser la voix par défaut", "跳过，使用默认声音", "건너뛰기, 기본 음성 사용", "Lewati, gunakan suara default", "Überspringen, Standardstimme nutzen", "Salta, usa voce predefinita", "スキップして既定の音声を使用", "Пропустить, использовать голос по умолчанию", "Omitir, usar voz predeterminada", "ข้าม ใช้เสียงเริ่มต้น");
+    public string OnboardingRetryButton => Pick("Tải lại", "Retry", "Réessayer", "重试", "다시 시도", "Coba lagi", "Erneut versuchen", "Riprova", "再試行", "Повторить", "Reintentar", "ลองใหม่");
+    public string OnboardingNoLanguages => Pick("Không tải được danh sách ngôn ngữ.", "Could not load language list.", "Impossible de charger la liste des langues.", "无法加载语言列表。", "언어 목록을 불러올 수 없습니다.", "Tidak dapat memuat daftar bahasa.", "Sprachliste konnte nicht geladen werden.", "Impossibile caricare la lista lingue.", "言語リストを読み込めません。", "Не удалось загрузить список языков.", "No se pudo cargar la lista de idiomas.", "ไม่สามารถโหลดรายการภาษาได้");
+    public string OnboardingCheckNetwork => Pick("Kiểm tra kết nối mạng và thử lại.", "Check your network connection and try again.", "Vérifiez votre connexion réseau et réessayez.", "请检查网络连接后重试。", "네트워크 연결을 확인하고 다시 시도하세요.", "Periksa koneksi jaringan lalu coba lagi.", "Prüfen Sie die Netzwerkverbindung und versuchen Sie es erneut.", "Controlla la connessione e riprova.", "ネットワーク接続を確認して再試行してください。", "Проверьте подключение и повторите попытку.", "Revisa la conexión e inténtalo de nuevo.", "ตรวจสอบเครือข่ายแล้วลองอีกครั้ง");
+    public string OnboardingNoVoices => Pick("Chưa có giọng đọc cho ngôn ngữ này.", "No voices available for this language.", "Aucune voix disponible pour cette langue.", "该语言暂无可用声音。", "이 언어에 사용할 수 있는 음성이 없습니다.", "Belum ada suara untuk bahasa ini.", "Für diese Sprache sind keine Stimmen verfügbar.", "Nessuna voce disponibile per questa lingua.", "この言語の音声はまだありません。", "Для этого языка нет голосов.", "No hay voces disponibles para este idioma.", "ยังไม่มีเสียงสำหรับภาษานี้");
+    public string OnboardingSkipHint => Pick("Bấm Bỏ qua để dùng giọng mặc định.", "Tap Skip to use the default voice.", "Touchez Passer pour utiliser la voix par défaut.", "点击“跳过”使用默认声音。", "기본 음성을 사용하려면 건너뛰기를 누르세요.", "Ketuk Lewati untuk memakai suara default.", "Tippen Sie auf Überspringen für die Standardstimme.", "Tocca Salta per usare la voce predefinita.", "既定の音声を使うにはスキップをタップしてください。", "Нажмите Пропустить, чтобы использовать голос по умолчанию.", "Toca Omitir para usar la voz predeterminada.", "แตะข้ามเพื่อใช้เสียงเริ่มต้น");
+    public string OnboardingSaving => Pick("Đang lưu lựa chọn...", "Saving your choice...", "Enregistrement de votre choix...", "正在保存选择...", "선택 저장 중...", "Menyimpan pilihan...", "Auswahl wird gespeichert...", "Salvataggio scelta...", "選択を保存中...", "Сохранение выбора...", "Guardando elección...", "กำลังบันทึกตัวเลือก...");
 
-    // --- MAP LOADING / EMPTY STATE ---
-    public string MapLoadingPois => CurrentLanguage switch { "English" => "Loading places...", "Français" => "Chargement des lieux...", "中文" => "正在加载地点...", "한국어" => "장소 불러오는 중...", _ => "Đang nạp địa điểm..." };
-    public string MapEmpty => CurrentLanguage switch { "English" => "No places yet.", "Français" => "Aucun lieu pour le moment.", "中文" => "暂无地点。", "한국어" => "아직 등록된 장소가 없습니다.", _ => "Chưa có địa điểm nào." };
-    public string PoiMissingAudioTitle => CurrentLanguage switch { "English" => "No narration", "Français" => "Pas de narration", "中文" => "暂无讲解", "한국어" => "안내 없음", _ => "Chưa có thuyết minh" };
-    public string PoiMissingAudioMessage => CurrentLanguage switch { "English" => "This place has no narration audio yet. Please add an audio URL on the admin web and try again.", "Français" => "Ce lieu n'a pas encore de narration audio. Veuillez ajouter une URL audio dans l'admin web puis réessayer.", "中文" => "该地点暂无讲解音频。请在管理后台添加音频 URL 后重试。", "한국어" => "이 장소에는 안내 오디오가 없습니다. 관리 페이지에서 오디오 URL을 추가한 뒤 다시 시도하세요.", _ => "Địa điểm này chưa có audio thuyết minh. Vui lòng tạo Audio URL trên trang quản trị web rồi thử lại." };
-    public string BackButton => CurrentLanguage switch { "English" => "Back", "Français" => "Retour", "中文" => "返回", "한국어" => "뒤로", _ => "Quay lại" };
-    public string CloseButton => CurrentLanguage switch { "English" => "Close", "Français" => "Fermer", "中文" => "关闭", "한국어" => "닫기", _ => "Đóng" };
-    public string ExitAppTitle => CurrentLanguage switch { "English" => "Exit app", "Français" => "Quitter l'app", "中文" => "退出应用", "한국어" => "앱 종료", _ => "Thoát ứng dụng" };
-    public string ExitAppMessage => CurrentLanguage switch { "English" => "Are you sure you want to exit?", "Français" => "Voulez-vous vraiment quitter?", "中文" => "确定要退出吗？", "한국어" => "정말 종료하시겠습니까?", _ => "Bạn có chắc muốn thoát?" };
-    public string YesButton => CurrentLanguage switch { "English" => "Yes", "Français" => "Oui", "中文" => "是", "한국어" => "예", _ => "Có" };
-    public string NoButton => CurrentLanguage switch { "English" => "No", "Français" => "Non", "中文" => "否", "한국어" => "아니요", _ => "Không" };
+    // --- MAP / COMMON ---
+    public string MapLoadingPois => Pick("Đang nạp địa điểm...", "Loading places...", "Chargement des lieux...", "正在加载地点...", "장소 불러오는 중...", "Memuat tempat...", "Orte werden geladen...", "Caricamento luoghi...", "場所を読み込み中...", "Загрузка мест...", "Cargando lugares...", "กำลังโหลดสถานที่...");
+    public string MapEmpty => Pick("Chưa có địa điểm nào.", "No places yet.", "Aucun lieu pour le moment.", "暂无地点。", "아직 등록된 장소가 없습니다.", "Belum ada tempat.", "Noch keine Orte.", "Nessun luogo disponibile.", "場所はまだありません。", "Пока нет мест.", "Aún no hay lugares.", "ยังไม่มีสถานที่");
+    public string PoiMissingAudioTitle => Pick("Chưa có thuyết minh", "No narration", "Pas de narration", "暂无讲解", "안내 없음", "Belum ada narasi", "Keine Erzählung", "Nessuna narrazione", "ナレーションなし", "Нет аудиогида", "Sin narración", "ยังไม่มีคำบรรยาย");
+    public string PoiMissingAudioMessage => Pick("Địa điểm này chưa có audio thuyết minh. Vui lòng tạo Audio URL trên trang quản trị web rồi thử lại.", "This place has no narration audio yet. Please add an audio URL on the admin web and try again.", "Ce lieu n'a pas encore de narration audio. Veuillez ajouter une URL audio dans l'admin web puis réessayer.", "该地点暂无讲解音频。请在管理后台添加音频 URL 后重试。", "이 장소에는 안내 오디오가 없습니다. 관리 페이지에서 오디오 URL을 추가한 뒤 다시 시도하세요.", "Tempat ini belum memiliki audio narasi. Tambahkan Audio URL di web admin lalu coba lagi.", "Für diesen Ort gibt es noch kein Audio. Bitte fügen Sie im Admin-Web eine Audio-URL hinzu.", "Questo luogo non ha ancora audio. Aggiungi un URL audio nel pannello admin e riprova.", "この場所にはまだナレーション音声がありません。管理画面でAudio URLを追加してください。", "Для этого места нет аудио. Добавьте Audio URL в админ-панели и повторите.", "Este lugar aún no tiene audio. Agrega una URL de audio en el admin web e inténtalo de nuevo.", "สถานที่นี้ยังไม่มีเสียงคำบรรยาย กรุณาเพิ่ม Audio URL ในหน้าแอดมินแล้วลองอีกครั้ง");
+    public string BackButton => Pick("Quay lại", "Back", "Retour", "返回", "뒤로", "Kembali", "Zurück", "Indietro", "戻る", "Назад", "Atrás", "ย้อนกลับ");
+    public string CloseButton => Pick("Đóng", "Close", "Fermer", "关闭", "닫기", "Tutup", "Schließen", "Chiudi", "閉じる", "Закрыть", "Cerrar", "ปิด");
+    public string ExitAppTitle => Pick("Thoát ứng dụng", "Exit app", "Quitter l'app", "退出应用", "앱 종료", "Keluar aplikasi", "App beenden", "Esci dall'app", "アプリを終了", "Выйти из приложения", "Salir de la app", "ออกจากแอป");
+    public string ExitAppMessage => Pick("Bạn có chắc muốn thoát?", "Are you sure you want to exit?", "Voulez-vous vraiment quitter?", "确定要退出吗？", "정말 종료하시겠습니까?", "Yakin ingin keluar?", "Möchten Sie wirklich beenden?", "Vuoi davvero uscire?", "終了しますか？", "Вы уверены, что хотите выйти?", "¿Seguro que quieres salir?", "ต้องการออกจริงหรือไม่?");
+    public string YesButton => Pick("Có", "Yes", "Oui", "是", "예", "Ya", "Ja", "Sì", "はい", "Да", "Sí", "ใช่");
+    public string NoButton => Pick("Không", "No", "Non", "否", "아니요", "Tidak", "Nein", "No", "いいえ", "Нет", "No", "ไม่");
 
-    // --- SHELL ---
-    public string TabHome => CurrentLanguage switch { "English" => "Home", "Français" => "Accueil", "中文" => "主页", "한국어" => "홈", _ => "Trang chủ" };
-    public string TabMap => CurrentLanguage switch { "English" => "Map", "Français" => "Carte", "中文" => "地图", "한국어" => "지도", _ => "Bản đồ" };
-    public string TabQr => CurrentLanguage switch { "English" => "QR", "Français" => "QR", "中文" => "二维码", "한국어" => "QR", _ => "Mã QR" };
-    public string TabSettings => CurrentLanguage switch { "English" => "Settings", "Français" => "Paramètres", "中文" => "设置", "한국어" => "설정", _ => "Cài đặt" };
+    // --- SHELL / MAP ---
+    public string TabHome => Pick("Trang chủ", "Home", "Accueil", "主页", "홈", "Beranda", "Start", "Home", "ホーム", "Главная", "Inicio", "หน้าหลัก");
+    public string TabMap => Pick("Bản đồ", "Map", "Carte", "地图", "지도", "Peta", "Karte", "Mappa", "地図", "Карта", "Mapa", "แผนที่");
+    public string TabQr => Pick("Mã QR", "QR", "QR", "二维码", "QR", "QR", "QR", "QR", "QR", "QR", "QR", "QR");
+    public string TabSettings => Pick("Cài đặt", "Settings", "Paramètres", "设置", "설정", "Pengaturan", "Einstellungen", "Impostazioni", "設定", "Настройки", "Ajustes", "การตั้งค่า");
+    public string MapTitle => Pick("Bản Đồ Du Lịch", "Tourist Map", "Carte touristique", "旅游地图", "관광 지도", "Peta Wisata", "Touristenkarte", "Mappa turistica", "観光マップ", "Туристическая карта", "Mapa turístico", "แผนที่ท่องเที่ยว");
+    public string GpsButton => Pick("📍 Vị trí", "📍 Location", "📍 Position", "📍 位置", "📍 위치", "📍 Lokasi", "📍 Standort", "📍 Posizione", "📍 現在地", "📍 Место", "📍 Ubicación", "📍 ตำแหน่ง");
+    public string FoodCategory => Pick("🍴 Thức ăn", "🍴 Food", "🍴 Cuisine", "🍴 美食", "🍴 음식", "🍴 Makanan", "🍴 Essen", "🍴 Cibo", "🍴 食事", "🍴 Еда", "🍴 Comida", "🍴 อาหาร");
+    public string FunCategory => Pick("🏛️ Vui chơi", "🏛️ Activities", "🏛️ Loisirs", "🏛️ 娱乐", "🏛️ 즐길거리", "🏛️ Aktivitas", "🏛️ Aktivitäten", "🏛️ Attività", "🏛️ アクティビティ", "🏛️ Развлечения", "🏛️ Actividades", "🏛️ กิจกรรม");
+    public string FestivalCategory => Pick("🎉 Lễ hội", "🎉 Festivals", "🎉 Festivals", "🎉 节庆", "🎉 축제", "🎉 Festival", "🎉 Festivals", "🎉 Festival", "🎉 祭り", "🎉 Фестивали", "🎉 Festivales", "🎉 เทศกาล");
+    public string TapToViewRoute => Pick("Nhấn để xem chi tiết & chỉ đường", "Tap to view details & directions", "Touchez pour voir les détails et l'itinéraire", "点击查看详情和路线", "눌러서 상세 정보 및 길찾기 보기", "Ketuk untuk detail & rute", "Tippen für Details & Route", "Tocca per dettagli e indicazioni", "タップして詳細と経路を表示", "Нажмите для деталей и маршрута", "Toca para ver detalles y ruta", "แตะเพื่อดูรายละเอียดและเส้นทาง");
+    public string ListenButton => Pick("🎧 Nghe thuyết minh", "🎧 Listen narration", "🎧 Écouter narration", "🎧 收听讲解", "🎧 안내 듣기", "🎧 Dengarkan narasi", "🎧 Audioführung hören", "🎧 Ascolta narrazione", "🎧 ナレーションを聞く", "🎧 Слушать аудиогид", "🎧 Escuchar narración", "🎧 ฟังคำบรรยาย");
+    public string StopButton => Pick("⏹️ Dừng", "⏹️ Stop", "⏹️ Arrêter", "⏹️ 停止", "⏹️ 중지", "⏹️ Berhenti", "⏹️ Stoppen", "⏹️ Stop", "⏹️ 停止", "⏹️ Стоп", "⏹️ Detener", "⏹️ หยุด");
+    public string LanguageActionSheetTitle => Pick("Ngôn ngữ", "Language", "Langue", "语言", "언어", "Bahasa", "Sprache", "Lingua", "言語", "Язык", "Idioma", "ภาษา");
+    public string CancelButton => Pick("Hủy", "Cancel", "Annuler", "取消", "취소", "Batal", "Abbrechen", "Annulla", "キャンセル", "Отмена", "Cancelar", "ยกเลิก");
+    public string SelectPoiNotice => Pick("Chọn địa điểm trong danh sách trước nhé!", "Please select a place in the list first.", "Veuillez d'abord sélectionner un lieu dans la liste.", "请先在列表中选择地点。", "먼저 목록에서 장소를 선택하세요.", "Pilih tempat dari daftar terlebih dahulu.", "Bitte zuerst einen Ort in der Liste wählen.", "Seleziona prima un luogo dalla lista.", "先にリストから場所を選択してください。", "Сначала выберите место из списка.", "Primero selecciona un lugar de la lista.", "กรุณาเลือกสถานที่จากรายการก่อน");
+    public string PermissionRequiredTitle => Pick("Thiếu quyền", "Permission required", "Autorisation requise", "需要权限", "권한 필요", "Izin diperlukan", "Berechtigung erforderlich", "Permesso richiesto", "権限が必要", "Требуется разрешение", "Permiso requerido", "ต้องการสิทธิ์");
+    public string PermissionRequiredMessage => Pick("Bạn cần cho phép ứng dụng dùng vị trí để lấy GPS.", "Please allow location permission to use GPS.", "Veuillez autoriser la localisation pour utiliser le GPS.", "请允许定位权限以使用 GPS。", "GPS를 사용하려면 위치 권한을 허용하세요.", "Izinkan akses lokasi untuk memakai GPS.", "Bitte erlauben Sie Standortzugriff für GPS.", "Consenti l'accesso alla posizione per usare il GPS.", "GPSを使うには位置情報の許可が必要です。", "Разрешите доступ к геолокации для GPS.", "Permite acceso a ubicación para usar GPS.", "โปรดอนุญาตตำแหน่งเพื่อใช้ GPS");
+    public string GpsErrorTitle => Pick("Lỗi GPS", "GPS error", "Erreur GPS", "GPS 错误", "GPS 오류", "Kesalahan GPS", "GPS-Fehler", "Errore GPS", "GPSエラー", "Ошибка GPS", "Error GPS", "ข้อผิดพลาด GPS");
+    public string RouteErrorTitle => Pick("Lỗi chỉ đường", "Route error", "Erreur d'itinéraire", "路线错误", "경로 오류", "Kesalahan rute", "Routenfehler", "Errore percorso", "経路エラー", "Ошибка маршрута", "Error de ruta", "ข้อผิดพลาดเส้นทาง");
+    public string AudioErrorTitle => Pick("Lỗi âm thanh", "Audio error", "Erreur audio", "音频错误", "오디오 오류", "Kesalahan audio", "Audiofehler", "Errore audio", "音声エラー", "Ошибка аудио", "Error de audio", "ข้อผิดพลาดเสียง");
+    public string GpsFetchFailedMessage => Pick("Không lấy được vị trí hiện tại.", "Could not get current location.", "Impossible d'obtenir la position actuelle.", "无法获取当前位置。", "현재 위치를 가져올 수 없습니다.", "Tidak dapat mengambil lokasi saat ini.", "Aktueller Standort konnte nicht ermittelt werden.", "Impossibile ottenere la posizione attuale.", "現在地を取得できません。", "Не удалось получить текущее местоположение.", "No se pudo obtener la ubicación actual.", "ไม่สามารถรับตำแหน่งปัจจุบันได้");
+    public string RouteDrawFailedMessage => Pick("Không vẽ được đường.", "Could not draw route.", "Impossible de tracer l'itinéraire.", "无法绘制路线。", "경로를 그릴 수 없습니다.", "Tidak dapat menggambar rute.", "Route konnte nicht gezeichnet werden.", "Impossibile tracciare il percorso.", "経路を描画できません。", "Не удалось построить маршрут.", "No se pudo dibujar la ruta.", "ไม่สามารถวาดเส้นทางได้");
+    public string DetailPrefix => Pick("Chi tiết", "Details", "Détails", "详情", "세부 정보", "Detail", "Details", "Dettagli", "詳細", "Подробности", "Detalles", "รายละเอียด");
+    public string ApiKeyMissingMessage => Pick("Bạn chưa cấu hình API Key cho chỉ đường.", "Routing API key is not configured.", "La clé API de guidage n'est pas configurée.", "尚未配置路线 API Key。", "길찾기 API 키가 설정되지 않았습니다.", "API key rute belum dikonfigurasi.", "Routing-API-Key ist nicht konfiguriert.", "API key percorso non configurata.", "経路APIキーが未設定です。", "API-ключ маршрута не настроен.", "La API key de rutas no está configurada.", "ยังไม่ได้ตั้งค่า API Key สำหรับเส้นทาง");
+    public string TtsServiceUnavailableMessage => Pick("Không có dịch vụ TTS trên thiết bị.", "No TTS service is available on this device.", "Aucun service TTS disponible sur cet appareil.", "设备上没有可用的 TTS 服务。", "이 기기에서 TTS 서비스를 사용할 수 없습니다.", "Layanan TTS tidak tersedia di perangkat ini.", "Kein TTS-Dienst auf diesem Gerät verfügbar.", "Nessun servizio TTS disponibile su questo dispositivo.", "この端末ではTTSサービスを利用できません。", "На устройстве нет службы TTS.", "No hay servicio TTS disponible en este dispositivo.", "ไม่มีบริการ TTS บนอุปกรณ์นี้");
+    public string TtsPlaybackFailedMessage => Pick("Không thể phát âm thanh cả cloud lẫn native.", "Unable to play audio from both cloud and native TTS.", "Impossible de lire l'audio via le cloud et le TTS natif.", "云端和本机 TTS 都无法播放音频。", "클라우드와 기본 TTS 모두에서 오디오를 재생할 수 없습니다.", "Tidak dapat memutar audio dari cloud maupun TTS perangkat.", "Audio kann weder über Cloud noch natives TTS abgespielt werden.", "Impossibile riprodurre audio cloud o TTS nativo.", "クラウド音声も端末TTSも再生できません。", "Не удалось воспроизвести аудио из облака и TTS устройства.", "No se pudo reproducir audio de nube ni TTS nativo.", "ไม่สามารถเล่นเสียงจากคลาวด์หรือ TTS เครื่องได้");
+    public string ServerFetchFailedMessage => Pick("Không lấy được dữ liệu từ server.", "Could not fetch data from server.", "Impossible de récupérer les données du serveur.", "无法从服务器获取数据。", "서버에서 데이터를 가져올 수 없습니다.", "Tidak dapat mengambil data dari server.", "Daten konnten nicht vom Server geladen werden.", "Impossibile recuperare dati dal server.", "サーバーからデータを取得できません。", "Не удалось получить данные с сервера.", "No se pudieron obtener datos del servidor.", "ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้");
+    public string EmptyServerDataMessage => Pick("Dữ liệu server rỗng.", "Server returned empty data.", "Le serveur a renvoyé des données vides.", "服务器返回了空数据。", "서버가 빈 데이터를 반환했습니다.", "Server mengembalikan data kosong.", "Server hat leere Daten zurückgegeben.", "Il server ha restituito dati vuoti.", "サーバーが空のデータを返しました。", "Сервер вернул пустые данные.", "El servidor devolvió datos vacíos.", "เซิร์ฟเวอร์ส่งข้อมูลว่างกลับมา");
 
-    // --- MAP ---
-    public string MapTitle => CurrentLanguage switch { "English" => "Tourist Map", "Français" => "Carte touristique", "中文" => "旅游地图", "한국어" => "관광 지도", _ => "Bản Đồ Du Lịch" };
-    public string GpsButton => CurrentLanguage switch { "English" => "📍 Location", "Français" => "📍 Position", "中文" => "📍 位置", "한국어" => "📍 위치", _ => "📍 Vị trí" };
-    public string FoodCategory => CurrentLanguage switch { "English" => "🍴 Food", "Français" => "🍴 Cuisine", "中文" => "🍴 美食", "한국어" => "🍴 음식", _ => "🍴 Thức ăn" };
-    public string FunCategory => CurrentLanguage switch { "English" => "🏛️ Activities", "Français" => "🏛️ Loisirs", "中文" => "🏛️ Vui chơi", "한국어" => "🏛️ 즐길거리", _ => "🏛️ Vui chơi" };
-    public string FestivalCategory => CurrentLanguage switch { "English" => "🎉 Festivals", "Français" => "🎉 Festivals", "中文" => "🎉 节庆", "한국어" => "🎉 축제", _ => "🎉 Lễ hội" };
-    public string TapToViewRoute => CurrentLanguage switch { "English" => "Tap to view details & directions", "Français" => "Touchez pour voir les détails et l'itinéraire", "中文" => "点击查看详情和路线", "한국어" => "눌러서 상세 정보 및 길찾기 보기", _ => "Nhấn để xem chi tiết & chỉ đường" };
-    public string ListenButton => CurrentLanguage switch { "English" => "🎧 Listen narration", "Français" => "🎧 Écouter narration", "中文" => "🎧 收听讲解", "한국어" => "🎧 안내 듣기", _ => "🎧 Nghe thuyết minh" };
-    public string StopButton => CurrentLanguage switch { "English" => "⏹️ Stop", "Français" => "⏹️ Arrêter", "中文" => "⏹️ Dừng", "한국어" => "⏹️ 중지", _ => "⏹️ Dừng" };
-    public string LanguageActionSheetTitle => CurrentLanguage switch { "English" => "Language", "Français" => "Langue", "中文" => "语言", "한국어" => "언어", _ => "Ngôn ngữ" };
-    public string CancelButton => CurrentLanguage switch { "English" => "Cancel", "Français" => "Annuler", "中文" => "取消", "한국어" => "취소", _ => "Hủy" };
-    public string SelectPoiNotice => CurrentLanguage switch { "English" => "Please select a place in the list first.", "Français" => "Veuillez d'abord sélectionner un lieu dans la liste.", "中文" => "请先在列表中选择地点。", "한국어" => "먼저 목록에서 장소를 선택하세요.", _ => "Chọn địa điểm trong danh sách trước nhé!" };
-    public string PermissionRequiredTitle => CurrentLanguage switch { "English" => "Permission required", "Français" => "Autorisation requise", "中文" => "需要权限", "한국어" => "권한 필요", _ => "Thiếu quyền" };
-    public string PermissionRequiredMessage => CurrentLanguage switch { "English" => "Please allow location permission to use GPS.", "Français" => "Veuillez autoriser la localisation pour utiliser le GPS.", "中文" => "请允许定位权限以使用 GPS。", "한국어" => "GPS를 사용하려면 위치 권한을 허용하세요.", _ => "Bạn cần cho phép ứng dụng dùng vị trí để lấy GPS." };
-    public string GpsErrorTitle => CurrentLanguage switch { "English" => "GPS error", "Français" => "Erreur GPS", "中文" => "GPS 错误", "한국어" => "GPS 오류", _ => "Lỗi GPS" };
-    public string RouteErrorTitle => CurrentLanguage switch { "English" => "Route error", "Français" => "Erreur d'itinéraire", "中文" => "路线错误", "한국어" => "경로 오류", _ => "Lỗi chỉ đường" };
-    public string AudioErrorTitle => CurrentLanguage switch { "English" => "Audio error", "Français" => "Erreur audio", "中文" => "音频错误", "한국어" => "오디오 오류", _ => "Lỗi âm thanh" };
-    public string GpsFetchFailedMessage => CurrentLanguage switch { "English" => "Could not get current location.", "Français" => "Impossible d'obtenir la position actuelle.", "中文" => "无法获取当前位置。", "한국어" => "현재 위치를 가져올 수 없습니다.", _ => "Không lấy được vị trí hiện tại." };
-    public string RouteDrawFailedMessage => CurrentLanguage switch { "English" => "Could not draw route.", "Français" => "Impossible de tracer l'itinéraire.", "中文" => "无法绘制路线。", "한국어" => "경로를 그릴 수 없습니다.", _ => "Không vẽ được đường." };
-    public string DetailPrefix => CurrentLanguage switch { "English" => "Details", "Français" => "Détails", "中文" => "详情", "한국어" => "세부 정보", _ => "Chi tiết" };
-    public string ApiKeyMissingMessage => CurrentLanguage switch { "English" => "Routing API key is not configured.", "Français" => "La clé API de guidage n'est pas configurée.", "中文" => "尚未配置路线 API Key。", "한국어" => "길찾기 API 키가 설정되지 않았습니다.", _ => "Bạn chưa cấu hình API Key cho chỉ đường." };
-    public string TtsServiceUnavailableMessage => CurrentLanguage switch { "English" => "No TTS service is available on this device.", "Français" => "Aucun service TTS disponible sur cet appareil.", "中文" => "设备上没有可用的 TTS 服务。", "한국어" => "이 기기에서 TTS 서비스를 사용할 수 없습니다.", _ => "Không có dịch vụ TTS trên thiết bị." };
-    public string TtsPlaybackFailedMessage => CurrentLanguage switch { "English" => "Unable to play audio from both cloud and native TTS.", "Français" => "Impossible de lire l'audio via le cloud et le TTS natif.", "中文" => "云端和本机 TTS 都无法播放音频。", "한국어" => "클라우드와 기본 TTS 모두에서 오디오를 재생할 수 없습니다.", _ => "Không thể phát âm thanh cả cloud lẫn native." };
-    public string ServerFetchFailedMessage => CurrentLanguage switch { "English" => "Could not fetch data from server.", "Français" => "Impossible de récupérer les données du serveur.", "中文" => "无法从服务器获取数据。", "한국어" => "서버에서 데이터를 가져올 수 없습니다.", _ => "Không lấy được dữ liệu từ server." };
-    public string EmptyServerDataMessage => CurrentLanguage switch { "English" => "Server returned empty data.", "Français" => "Le serveur a renvoyé des données vides.", "中文" => "服务器返回了空数据。", "한국어" => "서버가 빈 데이터를 반환했습니다.", _ => "Dữ liệu server rỗng." };
-
-    // --- QR PAGE ---
-    public string QrPageTitle => CurrentLanguage switch { "English" => "QR", "Français" => "QR", "中文" => "二维码", "한국어" => "QR", _ => "Mã QR" };
-    public string QrScanTitle => CurrentLanguage switch { "English" => "Scan QR code at the location", "Français" => "Scannez le QR du lieu", "中文" => "扫描景点二维码", "한국어" => "장소의 QR 코드를 스캔하세요", _ => "Quét mã QR tại điểm du lịch" };
-    public string QrScanHint => CurrentLanguage switch { "English" => "Move the camera near the QR code to hear detailed narration.", "Français" => "Approchez la caméra du QR pour écouter la narration détaillée.", "中文" => "将相机靠近二维码以收听详细讲解。", "한국어" => "QR 코드에 카메라를 가까이 대면 상세 안내를 들을 수 있습니다.", _ => "Hãy đưa camera lại gần mã QR để nghe thuyết minh chi tiết về địa danh này." };
-    public string QrNoInfoMessage => CurrentLanguage switch { "English" => "This location has no narration data yet!", "Français" => "Ce lieu ne contient pas encore d'information!", "中文" => "该地点暂时没有讲解信息！", "한국어" => "이 장소에는 아직 안내 정보가 없습니다!", _ => "Địa điểm này chưa có thông tin thuyết minh!" };
-    public string GreatButton => CurrentLanguage switch { "English" => "Great", "Français" => "Super", "中文" => "太好了", "한국어" => "좋아요", _ => "Tuyệt vời" };
-    public string ScanAgainButton => CurrentLanguage switch { "English" => "Scan again", "Français" => "Scanner à nouveau", "中文" => "重新扫描", "한국어" => "다시 스캔", _ => "Quét lại" };
-    public string NoticeTitle => CurrentLanguage switch { "English" => "Notice", "Français" => "Notice", "中文" => "提示", "한국어" => "알림", _ => "Thông báo" };
-
-    // --- LOCK SCREEN QR ---
-    public string TicketScanTitle => CurrentLanguage switch { "English" => "Center QR code in the frame", "Français" => "Placez le QR au centre du cadre", "中文" => "将二维码对准框中心", "한국어" => "QR 코드를 프레임 중앙에 맞추세요", _ => "Đưa mã QR vào trung tâm hộp" };
-    public string TicketSuccessMessage => CurrentLanguage switch { "English" => "Valid ticket confirmed!", "Français" => "Billet valide confirmé!", "中文" => "票券验证成功！", "한국어" => "유효한 티켓이 확인되었습니다!", _ => "Đã xác nhận vé hợp lệ!" };
-    public string TicketSuccessButton => CurrentLanguage switch { "English" => "Enter app", "Français" => "Entrer", "中文" => "进入应用", "한국어" => "앱 시작", _ => "Vào App" };
-    public string TicketInvalidMessage => CurrentLanguage switch { "English" => "Invalid ticket QR code!", "Français" => "QR billet invalide!", "中文" => "票券二维码无效！", "한국어" => "유효하지 않은 티켓 QR 코드입니다!", _ => "Mã vé không hợp lệ!" };
+    // --- QR ---
+    public string QrPageTitle => TabQr;
+    public string QrScanTitle => Pick("Quét mã QR tại điểm du lịch", "Scan QR code at the location", "Scannez le QR du lieu", "扫描景点二维码", "장소의 QR 코드를 스캔하세요", "Pindai QR di lokasi", "QR-Code am Ort scannen", "Scansiona il QR sul posto", "現地のQRコードをスキャン", "Сканируйте QR-код на месте", "Escanea el QR del lugar", "สแกน QR ณ สถานที่");
+    public string QrScanHint => Pick("Hãy đưa camera lại gần mã QR để nghe thuyết minh chi tiết về địa danh này.", "Move the camera near the QR code to hear detailed narration.", "Approchez la caméra du QR pour écouter la narration détaillée.", "将相机靠近二维码以收听详细讲解。", "QR 코드에 카메라를 가까이 대면 상세 안내를 들을 수 있습니다.", "Arahkan kamera ke QR untuk mendengar narasi detail.", "Halten Sie die Kamera an den QR-Code, um die Führung zu hören.", "Avvicina la fotocamera al QR per ascoltare la narrazione.", "QRコードにカメラを近づけると詳細な案内を聞けます。", "Поднесите камеру к QR-коду, чтобы услышать подробный рассказ.", "Acerca la cámara al QR para escuchar la narración.", "นำกล้องเข้าใกล้ QR เพื่อฟังคำบรรยายโดยละเอียด");
+    public string QrNoInfoMessage => Pick("Địa điểm này chưa có thông tin thuyết minh!", "This location has no narration data yet!", "Ce lieu ne contient pas encore d'information!", "该地点暂时没有讲解信息！", "이 장소에는 아직 안내 정보가 없습니다!", "Lokasi ini belum memiliki data narasi!", "Für diesen Ort gibt es noch keine Informationen!", "Questo luogo non ha ancora dati di narrazione!", "この場所にはまだ案内データがありません！", "Для этого места пока нет данных аудиогида!", "Este lugar aún no tiene datos de narración!", "สถานที่นี้ยังไม่มีข้อมูลคำบรรยาย!");
+    public string GreatButton => Pick("Tuyệt vời", "Great", "Super", "太好了", "좋아요", "Bagus", "Super", "Ottimo", "了解", "Отлично", "Genial", "เยี่ยม");
+    public string ScanAgainButton => Pick("Quét lại", "Scan again", "Scanner à nouveau", "重新扫描", "다시 스캔", "Pindai lagi", "Erneut scannen", "Scansiona di nuovo", "再スキャン", "Сканировать снова", "Escanear de nuevo", "สแกนอีกครั้ง");
+    public string NoticeTitle => Pick("Thông báo", "Notice", "Notice", "提示", "알림", "Pemberitahuan", "Hinweis", "Avviso", "通知", "Уведомление", "Aviso", "แจ้งเตือน");
+    public string TicketScanTitle => Pick("Đưa mã QR vào trung tâm hộp", "Center QR code in the frame", "Placez le QR au centre du cadre", "将二维码对准框中心", "QR 코드를 프레임 중앙에 맞추세요", "Posisikan QR di tengah bingkai", "QR-Code in die Mitte des Rahmens halten", "Centra il QR nel riquadro", "QRコードを枠の中央に合わせてください", "Поместите QR-код в центр рамки", "Centra el QR en el marco", "วาง QR ไว้กลางกรอบ");
+    public string TicketSuccessMessage => Pick("Đã xác nhận vé hợp lệ!", "Valid ticket confirmed!", "Billet valide confirmé!", "票券验证成功！", "유효한 티켓이 확인되었습니다!", "Tiket valid dikonfirmasi!", "Gültiges Ticket bestätigt!", "Biglietto valido confermato!", "有効なチケットを確認しました！", "Действительный билет подтвержден!", "¡Ticket válido confirmado!", "ยืนยันตั๋วถูกต้องแล้ว!");
+    public string TicketSuccessButton => Pick("Vào App", "Enter app", "Entrer", "进入应用", "앱 시작", "Masuk app", "App öffnen", "Entra nell'app", "アプリに入る", "Войти в приложение", "Entrar a la app", "เข้าแอป");
+    public string TicketInvalidMessage => Pick("Mã vé không hợp lệ!", "Invalid ticket QR code!", "QR billet invalide!", "票券二维码无效！", "유효하지 않은 티켓 QR 코드입니다!", "Kode QR tiket tidak valid!", "Ungültiger Ticket-QR-Code!", "QR del biglietto non valido!", "チケットQRコードが無効です！", "Недействительный QR-код билета!", "¡QR de ticket no válido!", "QR ตั๋วไม่ถูกต้อง!");
 
     public string LocalizeCategory(string rawCategory) => rawCategory switch
     {
-        "Thức ăn" => CurrentLanguage switch { "English" => "Food", "Français" => "Cuisine", "中文" => "美食", "한국어" => "음식", _ => "Thức ăn" },
-        "Vui chơi" => CurrentLanguage switch { "English" => "Activities", "Français" => "Loisirs", "中文" => "娱乐", "한국어" => "즐길거리", _ => "Vui chơi" },
-        "Lễ hội" => CurrentLanguage switch { "English" => "Festivals", "Français" => "Festivals", "中文" => "节庆", "한국어" => "축제", _ => "Lễ hội" },
+        "Thức ăn" => FoodCategory.Replace("🍴 ", string.Empty),
+        "Vui chơi" => FunCategory.Replace("🏛️ ", string.Empty),
+        "Lễ hội" => FestivalCategory.Replace("🎉 ", string.Empty),
         _ => rawCategory
     };
 

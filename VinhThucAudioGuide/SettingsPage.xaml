@@ -54,7 +54,8 @@
                 <TapGestureRecognizer Tapped="CloseLangMenu"/>
             </BoxView.GestureRecognizers>
         </BoxView>
-        <Frame x:Name="LangModal" VerticalOptions="End" TranslationY="600" Padding="20,20,20,40" CornerRadius="20" BackgroundColor="White">
+        <!-- Modal ngôn ngữ cũ không còn dùng. Hàng ngôn ngữ phía trên mở flow LanguageSelectionPage từ API. -->
+        <Frame x:Name="LangModal" IsVisible="False" VerticalOptions="End" TranslationY="600" Padding="20,20,20,40" CornerRadius="20" BackgroundColor="White">
             <VerticalStackLayout Spacing="10">
                 <Label x:Name="LblChooseLanguage" FontAttributes="Bold" FontSize="18" HorizontalOptions="Center" Margin="0,0,0,15" TextColor="Black"/>
                 <Button x:Name="BtnLangVi" Text="🇻🇳 Tiếng Việt" TextColor="Black" BackgroundColor="Transparent" FontSize="18" HorizontalOptions="Start" Clicked="OnLangSelected"/>
