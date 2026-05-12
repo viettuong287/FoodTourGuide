@@ -14,13 +14,8 @@ public partial class QRScannerPage : ContentPage
         InitializeComponent();
         UpdateUI();
 
-        // CHỖ NÀY ĐÃ ĐƯỢC SỬA CHUẨN: Truyền thẳng tên mã vạch, bỏ cái ngoặc vuông mảng đi!
-        CameraReader.Options = new BarcodeReaderOptions
-        {
-            Formats = BarcodeFormat.QrCode,
-            AutoRotate = true,
-            Multiple = false // Quét dính 1 cái là dừng
-        };
+        // Dùng helper chung để khỏi trùng cấu hình ZXing với QrPage; chỉ đọc QR, không cần barcode khác.
+        CameraReader.Options = QrCameraOptions.Default;
     }
 
     protected override void OnAppearing()
@@ -72,19 +67,7 @@ public partial class QRScannerPage : ContentPage
 
             if (verifyData?.IsValid == true)
             {
-                // QR hop le -> mo khoa app + dam bao co Device ID truoc khi qua buoc chon ngon ngu.
-                Preferences.Default.Set("IsAppUnlocked", true);
-                Services.ApiService.GetOrCreateDeviceId(); // sinh va luu UniqueDeviceId neu chua co
-
-                string msg = lm.TicketSuccessMessage;
-                if (verifyData.ExpiryAt.HasValue)
-                {
-                    string expiry = verifyData.ExpiryAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
-                    msg += $"\nHết hạn: {expiry}";
-                }
-
-                await DisplayAlert(lm.SuccessTitle, msg, lm.TicketSuccessButton);
-                Application.Current.MainPage = BuildPostQrRoot();
+                MarkUnlockedAndContinue(lm, verifyData);
             }
             else if (verifyData != null && !verifyData.IsValid)
             {
@@ -95,13 +78,10 @@ public partial class QRScannerPage : ContentPage
             }
             else
             {
-                // Offline hoặc lỗi mạng — fallback kiểm tra cục bộ
+                // Offline hoặc lỗi mạng — fallback kiểm tra cục bộ một mã hard-coded.
                 if (result.Value == "8E8F1796A99745F4")
                 {
-                    Preferences.Default.Set("IsAppUnlocked", true);
-                    Services.ApiService.GetOrCreateDeviceId();
-                    await DisplayAlert(lm.SuccessTitle, lm.TicketSuccessMessage, lm.TicketSuccessButton);
-                    Application.Current.MainPage = BuildPostQrRoot();
+                    MarkUnlockedAndContinue(lm, null);
                 }
                 else
                 {
@@ -112,19 +92,51 @@ public partial class QRScannerPage : ContentPage
         });
     }
 
-    private void BtnClose_Clicked(object sender, EventArgs e)
+    /// <summary>
+    /// Đánh dấu QR hợp lệ → lưu IsAppUnlocked + sinh DeviceId + hiển thị thông báo có expiry → đi tới root tiếp theo.
+    /// </summary>
+    private async void MarkUnlockedAndContinue(LocalizationManager lm, Services.QrVerifyData? verifyData)
     {
-        Application.Current.Quit();
+        Preferences.Default.Set(AppNavigation.PrefAppUnlocked, true);
+        Services.ApiService.GetOrCreateDeviceId(); // sinh và lưu UniqueDeviceId nếu chưa có
+
+        string msg = lm.TicketSuccessMessage;
+        if (verifyData?.ExpiryAt is { } expiryAt)
+        {
+            string expiry = expiryAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+            msg += $"\n{lm.UpdateTitle}: {expiry}";
+        }
+
+        await DisplayAlert(lm.SuccessTitle, msg, lm.TicketSuccessButton);
+        AppNavigation.GoToPostSplashRoot();
     }
 
-    // Sau khi quet QR thanh cong: neu user da chon ngon ngu + giong roi (qua lan truoc)
-    // thi vao thang AppShell. Nguoc lai dua qua flow chon ngon ngu -> chon giong.
-    // Bao boc trong NavigationPage de co the Push tu LanguageSelectionPage sang VoiceSelectionPage.
-    private static Page BuildPostQrRoot()
+    // Nút "✕" ở góc trên: nếu có trang trước trong NavigationPage thì pop về,
+    // nếu chưa unlock thì hỏi xác nhận thoát thay vì quit không cảnh báo,
+    // nếu đã unlock thì đưa user vào AppShell (đỡ lạc giữa các root).
+    private async void BtnClose_Clicked(object sender, EventArgs e)
     {
-        bool hasLanguage = !string.IsNullOrEmpty(Preferences.Default.Get("pref_language_id", string.Empty));
-        if (hasLanguage)
-            return new AppShell();
-        return new NavigationPage(new LanguageSelectionPage());
+        if (Navigation?.NavigationStack?.Count > 1)
+        {
+            await Navigation.PopAsync();
+            return;
+        }
+
+        if (AppNavigation.IsAppUnlocked)
+        {
+            AppNavigation.GoToPostSplashRoot();
+            return;
+        }
+
+        var lm = LocalizationManager.Instance;
+        bool confirm = await DisplayAlert(lm.ExitAppTitle, lm.ExitAppMessage, lm.YesButton, lm.NoButton);
+        if (confirm) Application.Current?.Quit();
+    }
+
+    // Khi user bấm back hệ thống: tái dụng logic của nút đóng ở trên.
+    protected override bool OnBackButtonPressed()
+    {
+        BtnClose_Clicked(this, EventArgs.Empty);
+        return true; // chặn back mặc định, mình tự xử lý
     }
 }

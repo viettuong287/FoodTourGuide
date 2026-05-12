@@ -238,6 +238,10 @@ namespace VinhThucAudioGuide
             btnGps.Text = lm.GpsButton;
             BtnListen.Text = lm.ListenButton;
             BtnStop.Text = lm.StopButton;
+            // Tiêu đề danh sách POI + nội dung empty state cũng cần đổi ngôn ngữ theo pref hiện tại.
+            if (LblPoiListTitle != null) LblPoiListTitle.Text = lm.FoodCategory;
+            if (LblPoiEmptyTitle != null) LblPoiEmptyTitle.Text = lm.MapEmpty;
+            if (LblPoiEmptyHint != null) LblPoiEmptyHint.Text = lm.OnboardingCheckNetwork;
             ApplyCategoryFilter();
         }
 
@@ -259,7 +263,9 @@ namespace VinhThucAudioGuide
         private async Task LoadDataAsync()
         {
             _allPois = new List<POI>();
-            var dbService = new VinhThucAudioGuide.Services.LocalDbService();
+            // Dùng singleton từ DI thay vì new để chia sẻ connection SQLite và tránh khởi tạo trùng schema.
+            var dbService = IPlatformApplication.Current?.Services.GetService<Services.LocalDbService>()
+                            ?? new Services.LocalDbService();
             var apiService = IPlatformApplication.Current?.Services.GetService<Services.ApiService>();
 
             // Tai danh sach stall tu API. Server da filter NarrationContent + AudioUrl
@@ -507,10 +513,8 @@ namespace VinhThucAudioGuide
             {
                 if (manualTrigger)
                 {
-                    await DisplayAlert(
-                        "Chưa có thuyết minh",
-                        "POI này chưa có audio thuyết minh. Vui lòng tạo Audio URL trên trang quản trị web rồi thử lại.",
-                        "OK");
+                    var lmAudio = LocalizationManager.Instance;
+                    await DisplayAlert(lmAudio.PoiMissingAudioTitle, lmAudio.PoiMissingAudioMessage, lmAudio.OkButton);
                 }
                 return;
             }

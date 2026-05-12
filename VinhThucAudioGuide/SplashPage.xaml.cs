@@ -94,32 +94,11 @@ public partial class SplashPage : ContentPage
         await Task.WhenAll(Task.Delay(2000), syncTask);
         await UpdateProgressAsync(1.0, "Đã sẵn sàng");
 
-        bool isUnlocked = Preferences.Default.Get("IsAppUnlocked", false);
-        if (!isUnlocked)
-        {
-            // Chưa quét QR → bắt user quét QR trước
-            Application.Current!.MainPage = new QRScannerPage();
-            return;
-        }
-
-        // Đã quét QR. Nếu user cũng đã chọn ngôn ngữ + giọng thì vào thẳng app.
-        // Nếu chưa chọn (vd: lần đầu sau khi quét QR) thì đi qua flow
-        // LanguageSelectionPage -> VoiceSelectionPage -> AppShell.
-        bool hasLanguagePref = !string.IsNullOrEmpty(Preferences.Default.Get("pref_language_id", string.Empty));
-        if (hasLanguagePref)
-        {
-            // Khôi phục ngôn ngữ UI từ pref_language_code (canonical) thay vì DisplayName để
-            // tránh trường hợp server trả "Vietnamese" mà LocalizationManager chỉ hiểu "Tiếng Việt".
-            var prefCode = Preferences.Default.Get("pref_language_code", string.Empty);
-            if (!string.IsNullOrWhiteSpace(prefCode))
-                LocalizationManager.Instance.SetLanguageByCode(prefCode);
-
-            Application.Current!.MainPage = new AppShell();
-        }
-        else
-        {
-            Application.Current!.MainPage = new NavigationPage(new LanguageSelectionPage());
-        }
+        // Điều hướng cuối cùng giao cho AppNavigation — gom toàn bộ rule:
+        //   chưa QR → QRScannerPage
+        //   QR rồi nhưng chưa chọn ngôn ngữ/giọng → LanguageSelectionPage (NavigationPage để có back)
+        //   QR rồi + đã có pref → AppShell (đồng thời restore ngôn ngữ UI theo pref_language_code).
+        AppNavigation.GoToPostSplashRoot();
     }
 
     /// <summary>

@@ -1,7 +1,25 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Storage;
+using Microsoft.Maui.ApplicationModel;
+using ZXing.Net.Maui;
 
 namespace VinhThucAudioGuide;
+
+/// <summary>
+/// Cấu hình camera ZXing dùng chung cho QRScannerPage (lock screen) và QrPage (POI scanner).
+/// Cả hai chỉ cần đọc QR, không cần barcode khác → tránh trùng setup ở 2 chỗ.
+/// </summary>
+internal static class QrCameraOptions
+{
+    public static BarcodeReaderOptions Default { get; } = new BarcodeReaderOptions
+    {
+        Formats = BarcodeFormat.QrCode,
+        AutoRotate = true,
+        Multiple = false
+    };
+}
 
 public class LocalizationManager : INotifyPropertyChanged
 {
@@ -97,6 +115,32 @@ public class LocalizationManager : INotifyPropertyChanged
     public string UpdateTitle => CurrentLanguage switch { "English" => "Update", "Français" => "Mise à jour", "中文" => "更新", "한국어" => "업데이트", _ => "Cập nhật" };
     public string OkButton => CurrentLanguage switch { "English" => "OK", "Français" => "OK", "中文" => "确定", "한국어" => "확인", _ => "OK" };
 
+    // --- ONBOARDING (chọn ngôn ngữ + giọng đọc) ---
+    public string OnboardingLanguageTitle => CurrentLanguage switch { "English" => "Choose narration language", "Français" => "Choisir la langue de narration", "中文" => "选择讲解语言", "한국어" => "내레이션 언어 선택", _ => "Chọn ngôn ngữ thuyết minh" };
+    public string OnboardingLanguageSubtitle => CurrentLanguage switch { "English" => "Pick the language you want to hear. Next you will choose a voice.", "Français" => "Choisissez la langue à écouter. Vous choisirez ensuite une voix.", "中文" => "选择你想要听的语言。下一步将选择朗读声音。", "한국어" => "원하는 언어를 선택하세요. 다음 단계에서 음성을 선택합니다.", _ => "Hãy chọn ngôn ngữ bạn muốn nghe. Bước sau bạn sẽ chọn giọng đọc." };
+    public string OnboardingVoiceTitle => CurrentLanguage switch { "English" => "Choose a voice", "Français" => "Choisir une voix", "中文" => "选择朗读声音", "한국어" => "음성 선택", _ => "Chọn giọng đọc" };
+    public string OnboardingVoiceDefaultLabel => CurrentLanguage switch { "English" => "Default", "Français" => "Par défaut", "中文" => "默认", "한국어" => "기본", _ => "Mặc định" };
+    public string OnboardingVoiceSubtitle => CurrentLanguage switch { "English" => "Voice", "Français" => "Voix", "中文" => "声音", "한국어" => "음성", _ => "Giọng đọc" };
+    public string OnboardingSkipVoiceButton => CurrentLanguage switch { "English" => "Skip, use default voice", "Français" => "Passer, utiliser la voix par défaut", "中文" => "跳过，使用默认声音", "한국어" => "건너뛰기, 기본 음성 사용", _ => "Bỏ qua, dùng giọng mặc định" };
+    public string OnboardingRetryButton => CurrentLanguage switch { "English" => "Retry", "Français" => "Réessayer", "中文" => "重试", "한국어" => "다시 시도", _ => "Tải lại" };
+    public string OnboardingNoLanguages => CurrentLanguage switch { "English" => "Could not load language list.", "Français" => "Impossible de charger la liste des langues.", "中文" => "无法加载语言列表。", "한국어" => "언어 목록을 불러올 수 없습니다.", _ => "Không tải được danh sách ngôn ngữ." };
+    public string OnboardingCheckNetwork => CurrentLanguage switch { "English" => "Check your network connection and try again.", "Français" => "Vérifiez votre connexion réseau et réessayez.", "中文" => "请检查网络连接后重试。", "한국어" => "네트워크 연결을 확인하고 다시 시도하세요.", _ => "Kiểm tra kết nối mạng và thử lại." };
+    public string OnboardingNoVoices => CurrentLanguage switch { "English" => "No voices available for this language.", "Français" => "Aucune voix disponible pour cette langue.", "中文" => "该语言暂无可用声音。", "한국어" => "이 언어에 사용할 수 있는 음성이 없습니다.", _ => "Chưa có giọng đọc cho ngôn ngữ này." };
+    public string OnboardingSkipHint => CurrentLanguage switch { "English" => "Tap Skip to use the default voice.", "Français" => "Touchez Passer pour utiliser la voix par défaut.", "中文" => "点击“跳过”使用默认声音。", "한국어" => "기본 음성을 사용하려면 건너뛰기를 누르세요.", _ => "Bấm Bỏ qua để dùng giọng mặc định." };
+    public string OnboardingSaving => CurrentLanguage switch { "English" => "Saving your choice...", "Français" => "Enregistrement de votre choix...", "中文" => "正在保存选择...", "한국어" => "선택 저장 중...", _ => "Đang lưu lựa chọn..." };
+
+    // --- MAP LOADING / EMPTY STATE ---
+    public string MapLoadingPois => CurrentLanguage switch { "English" => "Loading places...", "Français" => "Chargement des lieux...", "中文" => "正在加载地点...", "한국어" => "장소 불러오는 중...", _ => "Đang nạp địa điểm..." };
+    public string MapEmpty => CurrentLanguage switch { "English" => "No places yet.", "Français" => "Aucun lieu pour le moment.", "中文" => "暂无地点。", "한국어" => "아직 등록된 장소가 없습니다.", _ => "Chưa có địa điểm nào." };
+    public string PoiMissingAudioTitle => CurrentLanguage switch { "English" => "No narration", "Français" => "Pas de narration", "中文" => "暂无讲解", "한국어" => "안내 없음", _ => "Chưa có thuyết minh" };
+    public string PoiMissingAudioMessage => CurrentLanguage switch { "English" => "This place has no narration audio yet. Please add an audio URL on the admin web and try again.", "Français" => "Ce lieu n'a pas encore de narration audio. Veuillez ajouter une URL audio dans l'admin web puis réessayer.", "中文" => "该地点暂无讲解音频。请在管理后台添加音频 URL 后重试。", "한국어" => "이 장소에는 안내 오디오가 없습니다. 관리 페이지에서 오디오 URL을 추가한 뒤 다시 시도하세요.", _ => "Địa điểm này chưa có audio thuyết minh. Vui lòng tạo Audio URL trên trang quản trị web rồi thử lại." };
+    public string BackButton => CurrentLanguage switch { "English" => "Back", "Français" => "Retour", "中文" => "返回", "한국어" => "뒤로", _ => "Quay lại" };
+    public string CloseButton => CurrentLanguage switch { "English" => "Close", "Français" => "Fermer", "中文" => "关闭", "한국어" => "닫기", _ => "Đóng" };
+    public string ExitAppTitle => CurrentLanguage switch { "English" => "Exit app", "Français" => "Quitter l'app", "中文" => "退出应用", "한국어" => "앱 종료", _ => "Thoát ứng dụng" };
+    public string ExitAppMessage => CurrentLanguage switch { "English" => "Are you sure you want to exit?", "Français" => "Voulez-vous vraiment quitter?", "中文" => "确定要退出吗？", "한국어" => "정말 종료하시겠습니까?", _ => "Bạn có chắc muốn thoát?" };
+    public string YesButton => CurrentLanguage switch { "English" => "Yes", "Français" => "Oui", "中文" => "是", "한국어" => "예", _ => "Có" };
+    public string NoButton => CurrentLanguage switch { "English" => "No", "Français" => "Non", "中文" => "否", "한국어" => "아니요", _ => "Không" };
+
     // --- SHELL ---
     public string TabHome => CurrentLanguage switch { "English" => "Home", "Français" => "Accueil", "中文" => "主页", "한국어" => "홈", _ => "Trang chủ" };
     public string TabMap => CurrentLanguage switch { "English" => "Map", "Français" => "Carte", "中文" => "地图", "한국어" => "지도", _ => "Bản đồ" };
@@ -155,4 +199,79 @@ public class LocalizationManager : INotifyPropertyChanged
     public event PropertyChangedEventHandler PropertyChanged;
     protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}
+
+/// <summary>
+/// Helper gom logic điều hướng cấp app để các page không phải tự gán
+/// Application.Current.MainPage rải rác.
+///
+/// Quy tắc luồng app:
+///   1. Chưa quét QR (IsAppUnlocked = false) → luôn ép vào QRScannerPage.
+///   2. Đã quét QR nhưng chưa chọn ngôn ngữ + giọng (pref_language_id rỗng)
+///      → NavigationPage(LanguageSelectionPage) để user chọn 2 bước rồi tự vào AppShell.
+///   3. Đã quét QR và đã chọn ngôn ngữ + giọng → AppShell (Home/Map/QR/Settings).
+/// </summary>
+public static class AppNavigation
+{
+    public const string PrefAppUnlocked = "IsAppUnlocked";
+    public const string PrefLanguageId = "pref_language_id";
+    public const string PrefLanguageCode = "pref_language_code";
+
+    public static bool IsAppUnlocked => Preferences.Default.Get(PrefAppUnlocked, false);
+
+    public static bool HasLanguagePreference =>
+        !string.IsNullOrEmpty(Preferences.Default.Get(PrefLanguageId, string.Empty));
+
+    /// <summary>
+    /// Trả về root page phù hợp dựa trên trạng thái app hiện tại.
+    /// Dùng ở Splash sau khi sync xong, và sau khi quét QR thành công.
+    /// </summary>
+    public static Page BuildPostSplashRoot()
+    {
+        if (!IsAppUnlocked)
+            return new QRScannerPage();
+
+        if (!HasLanguagePreference)
+            return new NavigationPage(new LanguageSelectionPage());
+
+        // Khôi phục ngôn ngữ UI từ code chuẩn trước khi vào AppShell để Home/Map/Settings
+        // hiển thị đúng ngôn ngữ ngay lần đầu render, không phải đợi user mở Settings.
+        var prefCode = Preferences.Default.Get(PrefLanguageCode, string.Empty);
+        if (!string.IsNullOrWhiteSpace(prefCode))
+            LocalizationManager.Instance.SetLanguageByCode(prefCode);
+
+        return new AppShell();
+    }
+
+    /// <summary>
+    /// Áp dụng root page mới cho Application.Current.MainPage.
+    /// Bọc trong MainThread để an toàn khi gọi từ task nền (Splash sync, heartbeat...).
+    /// </summary>
+    public static void SetMainPage(Page page)
+    {
+        if (Application.Current is null) return;
+
+        if (MainThread.IsMainThread)
+        {
+            Application.Current.MainPage = page;
+        }
+        else
+        {
+            MainThread.BeginInvokeOnMainThread(() => Application.Current.MainPage = page);
+        }
+    }
+
+    /// <summary>
+    /// Mở lại flow chọn ngôn ngữ + giọng đọc (dùng từ Settings).
+    /// Sau khi user chọn xong, VoiceSelectionPage sẽ tự gọi SetMainPage(AppShell).
+    /// </summary>
+    public static void OpenLanguageFlow()
+        => SetMainPage(new NavigationPage(new LanguageSelectionPage()));
+
+    /// <summary>
+    /// Đi tới root phù hợp ngay bây giờ — tiện cho QRScannerPage sau khi quét xong
+    /// và Splash khi đã chuẩn bị xong dữ liệu.
+    /// </summary>
+    public static void GoToPostSplashRoot()
+        => SetMainPage(BuildPostSplashRoot());
 }

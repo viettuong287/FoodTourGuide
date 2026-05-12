@@ -30,7 +30,7 @@
         </Grid>
 
         <!-- 3. TIÊU ĐỀ DANH SÁCH -->
-        <Label Grid.Row="2" Text="🍴 Danh sách món ăn" FontAttributes="Bold" FontSize="18" Margin="15,10,0,5" TextColor="White"/>
+        <Label x:Name="LblPoiListTitle" Grid.Row="2" Text="🍴 Danh sách món ăn" FontAttributes="Bold" FontSize="18" Margin="15,10,0,5" TextColor="White"/>
 
         <!-- 4. DANH SÁCH ĐỊA ĐIỂM -->
         <CollectionView x:Name="cvPoiList" 
@@ -38,6 +38,13 @@
                         SelectionMode="Single" 
                         SelectionChanged="Poi_Selected" 
                         Margin="15,0">
+            <CollectionView.EmptyView>
+                <!-- Hiển thị khi danh sách POI rỗng (vd: offline lần đầu, server chưa có data) -->
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="6" Padding="20">
+                    <Label x:Name="LblPoiEmptyTitle" Text="Chưa có địa điểm nào." FontSize="14" HorizontalTextAlignment="Center" TextColor="#CCCCCC"/>
+                    <Label x:Name="LblPoiEmptyHint" Text="Kiểm tra kết nối mạng và thử lại." FontSize="12" HorizontalTextAlignment="Center" TextColor="#9AA0A6"/>
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate>
                     <!-- POI card: dùng DataTrigger theo IsSelected để chuyển sang giao diện tối khi được chọn.

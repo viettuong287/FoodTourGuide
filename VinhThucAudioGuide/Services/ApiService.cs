@@ -64,12 +64,11 @@ public class ApiService
     }
 
     /// <summary>
-    /// Đăng ký hoặc cập nhật thông tin thiết bị lên Server để Admin quản lý
+    /// Wrapper cũ giữ lại cho tương thích — chỉ chuyển tiếp sang SendHeartbeatAsync.
+    /// Mọi tham số ngôn ngữ sẽ bị bỏ qua nếu Preferences đã có pref_language_id để tránh
+    /// ghi đè lựa chọn user. Nên dùng trực tiếp SendHeartbeatAsync ở code mới.
     /// </summary>
-    public async Task RegisterDeviceAsync(string languageId)
-    {
-        await SendHeartbeatAsync(languageId);
-    }
+    public Task RegisterDeviceAsync(string languageId) => SendHeartbeatAsync(languageId);
 
     /// <summary>
     /// Gửi tín hiệu Heartbeat để Server biết thiết bị vẫn đang online (thời gian thực).
@@ -117,17 +116,11 @@ public class ApiService
             var response = await _httpClient.PostAsJsonAsync("device-preference", deviceDto);
             System.Diagnostics.Debug.WriteLine($"[Heartbeat] Sent for {deviceId} (lang={languageId}, voice={voiceId}). Status: {response.StatusCode}");
         }
-        catch (Exception ex) 
-        { 
+        catch (Exception ex)
+        {
+            // Heartbeat lỗi (offline, server sập, ...) không nên chặn UX của user.
+            // Log để debug, không bật alert vì sẽ hiện popup nhảy lung tung khi mất mạng tạm thời.
             System.Diagnostics.Debug.WriteLine($"[Heartbeat] Error: {ex.Message}");
-            // Chỉ hiện thông báo này khi đang ở màn hình Splash để debug
-            if (Application.Current?.MainPage is SplashPage splash)
-            {
-                MainThread.BeginInvokeOnMainThread(async () => {
-                    await splash.DisplayAlert("Lỗi kết nối", 
-                        $"Không thể gửi tín hiệu tới Server tại {_httpClient.BaseAddress}. Lỗi: {ex.Message}. Vui lòng kiểm tra Wifi!", "OK");
-                });
-            }
         }
     }
 

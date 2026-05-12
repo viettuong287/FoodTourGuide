@@ -115,13 +115,17 @@ namespace VinhThucAudioGuide
 
         public LanguageSelectionPage()
         {
-            Title = "Chon ngon ngu";
+            var lm = LocalizationManager.Instance;
+            Title = lm.OnboardingLanguageTitle;
             BackgroundColor = Color.FromArgb("#0F1115");
-            NavigationPage.SetHasBackButton(this, false);
+            // Cho phép back nếu trang được push lên một stack hiện có (vd: vào Settings).
+            // SplashPage/QRScannerPage set NavigationPage(LanguageSelectionPage) làm root → NavigationStack chỉ có 1 page,
+            // MAUI tự ẩn nút back trong trường hợp đó. Như vậy đảm bảo không trang nào "kẹt".
+            NavigationPage.SetHasBackButton(this, true);
 
             var lblHeader = new Label
             {
-                Text = "Chon ngon ngu thuyet minh",
+                Text = lm.OnboardingLanguageTitle,
                 FontSize = 22,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Colors.White,
@@ -130,7 +134,7 @@ namespace VinhThucAudioGuide
 
             var lblSubtitle = new Label
             {
-                Text = "Hay chon ngon ngu ban muon nghe. Buoc sau ban se chon giong doc.",
+                Text = lm.OnboardingLanguageSubtitle,
                 FontSize = 13,
                 TextColor = Color.FromArgb("#B8B8B8"),
                 LineHeight = 1.4,
@@ -160,15 +164,15 @@ namespace VinhThucAudioGuide
                     Spacing = 8,
                     Children =
                     {
-                        new Label { Text = "Khong tai duoc danh sach ngon ngu.", TextColor = Colors.White, HorizontalTextAlignment = TextAlignment.Center },
-                        new Label { Text = "Kiem tra ket noi mang va thu lai.", FontSize = 12, TextColor = Color.FromArgb("#9AA0A6"), HorizontalTextAlignment = TextAlignment.Center }
+                        new Label { Text = lm.OnboardingNoLanguages, TextColor = Colors.White, HorizontalTextAlignment = TextAlignment.Center },
+                        new Label { Text = lm.OnboardingCheckNetwork, FontSize = 12, TextColor = Color.FromArgb("#9AA0A6"), HorizontalTextAlignment = TextAlignment.Center }
                     }
                 }
             };
 
             BtnRetry = new Button
             {
-                Text = "Tai lai",
+                Text = lm.OnboardingRetryButton,
                 IsVisible = false,
                 BackgroundColor = Color.FromArgb("#FFCC00"),
                 TextColor = Color.FromArgb("#111111"),
@@ -318,7 +322,7 @@ namespace VinhThucAudioGuide
             {
                 try
                 {
-                    var localDb = new LocalDbService();
+                    var localDb = IPlatformApplication.Current?.Services.GetService<LocalDbService>() ?? new LocalDbService();
                     var localLangs = await localDb.GetAllLanguages();
                     foreach (var l in localLangs)
                     {
@@ -391,13 +395,14 @@ namespace VinhThucAudioGuide
         public VoiceSelectionPage(LanguageSelectionPage.LanguageItem language)
         {
             _language = language ?? throw new ArgumentNullException(nameof(language));
+            var lm = LocalizationManager.Instance;
 
-            Title = "Chon giong doc";
+            Title = lm.OnboardingVoiceTitle;
             BackgroundColor = Color.FromArgb("#0F1115");
 
             var lblHeader = new Label
             {
-                Text = "Chon giong doc",
+                Text = lm.OnboardingVoiceTitle,
                 FontSize = 22,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Colors.White,
@@ -457,15 +462,15 @@ namespace VinhThucAudioGuide
                     Spacing = 8,
                     Children =
                     {
-                        new Label { Text = "Chua co giong doc cho ngon ngu nay.", TextColor = Colors.White, HorizontalTextAlignment = TextAlignment.Center },
-                        new Label { Text = "Bam Bo qua de dung giong mac dinh.", FontSize = 12, TextColor = Color.FromArgb("#9AA0A6"), HorizontalTextAlignment = TextAlignment.Center }
+                        new Label { Text = lm.OnboardingNoVoices, TextColor = Colors.White, HorizontalTextAlignment = TextAlignment.Center },
+                        new Label { Text = lm.OnboardingSkipHint, FontSize = 12, TextColor = Color.FromArgb("#9AA0A6"), HorizontalTextAlignment = TextAlignment.Center }
                     }
                 }
             };
 
             BtnSkip = new Button
             {
-                Text = "Bo qua, dung giong mac dinh",
+                Text = lm.OnboardingSkipVoiceButton,
                 BackgroundColor = Colors.Transparent,
                 TextColor = Color.FromArgb("#FFCC00"),
                 BorderColor = Color.FromArgb("#FFCC00"),
@@ -490,7 +495,7 @@ namespace VinhThucAudioGuide
                         Children =
                         {
                             new ActivityIndicator { IsRunning = true, Color = Color.FromArgb("#FFCC00"), HeightRequest = 48 },
-                            new Label { Text = "Dang luu lua chon...", TextColor = Colors.White, FontSize = 14 }
+                            new Label { Text = lm.OnboardingSaving, TextColor = Colors.White, FontSize = 14 }
                         }
                     }
                 }
@@ -600,6 +605,7 @@ namespace VinhThucAudioGuide
                     var voices = await apiService.GetVoicesAsync(_language.Id);
                     if (voices != null)
                     {
+                        var lm2 = LocalizationManager.Instance;
                         foreach (var v in voices)
                         {
                             _items.Add(new VoiceItem
@@ -607,7 +613,7 @@ namespace VinhThucAudioGuide
                                 Id          = v.Id,
                                 DisplayName = v.DisplayName,
                                 IsDefault   = v.IsDefault,
-                                Subtitle    = v.IsDefault ? "Mac dinh" : "Giong doc"
+                                Subtitle    = v.IsDefault ? lm2.OnboardingVoiceDefaultLabel : lm2.OnboardingVoiceSubtitle
                             });
                         }
                     }
@@ -667,8 +673,9 @@ namespace VinhThucAudioGuide
                 _isSaving = false;
             }
 
-            if (Application.Current != null)
-                Application.Current.MainPage = new AppShell();
+            // Sau khi đã có pref đầy đủ → vào thẳng AppShell.
+            // Dùng helper để chạy đúng MainThread và không xung đột với SavingOverlay.
+            AppNavigation.SetMainPage(new AppShell());
         }
 
         public class VoiceItem

@@ -69,7 +69,8 @@ public partial class SettingsPage : ContentPage
             var remoteList = System.Text.Json.JsonSerializer.Deserialize<List<Models.TourLocation>>(json);
             if (remoteList == null) { await DisplayAlert(lm.ErrorTitle, lm.EmptyServerDataMessage, lm.OkButton); return; }
 
-            var db = new Services.LocalDbService();
+            var db = IPlatformApplication.Current?.Services.GetService<Services.LocalDbService>()
+                     ?? new Services.LocalDbService();
             int added = await db.UpsertTourLocations(remoteList);
 
             Preferences.Default.Set("LastUpdateCheck", DateTime.UtcNow.ToString());
@@ -151,8 +152,7 @@ public partial class SettingsPage : ContentPage
     // (giống flow sau khi quét QR). Như vậy ngôn ngữ thuyết minh & UI luôn đồng bộ.
     private void OpenLangMenu(object sender, EventArgs e)
     {
-        if (Application.Current != null)
-            Application.Current.MainPage = new NavigationPage(new LanguageSelectionPage());
+        AppNavigation.OpenLanguageFlow();
     }
 
     // CloseLangMenu/OnLangSelected vẫn được giữ trong XAML (để tương thích) nhưng KHÔNG còn dùng.

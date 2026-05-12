@@ -17,15 +17,10 @@ public partial class QrPage : ContentPage
         InitializeComponent();
         UpdateUI();
 
-        // Khởi tạo Database ngay khi mở trang
-        _dbService = new LocalDbService();
+        // Lấy LocalDbService từ DI để chia sẻ singleton; fallback new nếu DI không sẵn sàng (vd: test).
+        _dbService = IPlatformApplication.Current?.Services.GetService<LocalDbService>() ?? new LocalDbService();
 
-        CameraReader.Options = new BarcodeReaderOptions
-        {
-            Formats = BarcodeFormat.QrCode,
-            AutoRotate = true,
-            Multiple = false
-        };
+        CameraReader.Options = QrCameraOptions.Default;
     }
 
     protected override void OnAppearing()
@@ -72,18 +67,25 @@ public partial class QrPage : ContentPage
             string maQRKhachQuet = result.Value;
 
             var lm = LocalizationManager.Instance;
-            var langCode = Preferences.Default.Get("AppLang", "Tiếng Việt") switch
-            {
-                "English" => "en",
-                "Français" => "fr",
-                "中文" => "zh",
-                "한국어" => "ko",
-                _ => "vi"
-            };
+            // Ưu tiên ngôn ngữ user đã chọn ở LanguageSelectionPage (pref_language_code).
+            // Fallback AppLang để tương thích bản cũ chưa đi qua luồng mới.
+            var prefCode = Preferences.Default.Get("pref_language_code", string.Empty);
+            var langCode = !string.IsNullOrWhiteSpace(prefCode)
+                ? prefCode.Split('-')[0].ToLowerInvariant()
+                : Preferences.Default.Get("AppLang", "Tiếng Việt") switch
+                {
+                    "English" => "en",
+                    "Français" => "fr",
+                    "中文" => "zh",
+                    "한국어" => "ko",
+                    _ => "vi"
+                };
 
             var kichBan = await _dbService.GetScriptByQRAndLanguage(maQRKhachQuet, langCode);
             if (kichBan == null && langCode != "vi")
             {
+                // Không có script đúng ngôn ngữ user chọn -> rơi về tiếng Việt cho khỏi trống tay.
+                // Riêng audio map đã filter ngôn ngữ ở API; chỗ này chỉ là script QR hiển thị popup.
                 kichBan = await _dbService.GetScriptByQRAndLanguage(maQRKhachQuet, "vi");
             }
 
