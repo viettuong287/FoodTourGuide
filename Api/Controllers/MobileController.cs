@@ -262,6 +262,9 @@ namespace Api.Controllers
             return File(dl.Value.Content, dl.Value.Details.ContentType ?? "audio/mpeg");
         }
 
+        // Tìm Language theo mã user gửi lên.
+        // Ưu tiên theo thứ tự: trùng tuyệt đối, trùng phần ngắn (vi/en/zh), rồi mới đến biến thể (zh-CN, en-GB).
+        // Sắp xếp ưu tiên IsActive=true để admin có thể tắt biến thể không dùng nữa.
         private async Task<Language?> ResolveLanguageAsync(string? lang, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(lang)) return null;
@@ -270,10 +273,14 @@ namespace Api.Controllers
             var shortCode = normalized.Split('-')[0];
 
             return await _context.Languages
-                .FirstOrDefaultAsync(l =>
+                .Where(l =>
                     l.Code == normalized
                     || l.Code == shortCode
-                    || l.Code.StartsWith(shortCode + "-"), cancellationToken);
+                    || l.Code.StartsWith(shortCode + "-"))
+                .OrderByDescending(l => l.IsActive)
+                .ThenByDescending(l => l.Code == normalized)
+                .ThenByDescending(l => l.Code == shortCode)
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         private static NarrationAudio? SelectAudioForLanguage(

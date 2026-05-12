@@ -198,31 +198,5 @@ namespace Api.Application.Services
             return list[0].AudioUrl;
         }
 
-        /// <summary>
-        /// Tính khoảng cách giữa 2 điểm GPS bằng công thức Haversine.
-        /// Haversine tính khoảng cách trên mặt cầu, chính xác hơn công thức phẳng
-        /// khi 2 điểm ở xa nhau hoặc gần cực.
-        /// Bán kính Trái Đất dùng: 6,371,000 mét (6,371 km).
-        /// </summary>
-        private static decimal CalculateDistanceMeters(decimal lat1, decimal lon1, decimal lat2, decimal lon2)
-        {
-            var r = 6_371_000d; // Bán kính trung bình của Trái Đất (mét)
-
-            var dLat = ToRadians((double)(lat2 - lat1)); // Hiệu vĩ độ (radian)
-            var dLon = ToRadians((double)(lon2 - lon1)); // Hiệu kinh độ (radian)
-
-            // Công thức Haversine: a = sin²(Δlat/2) + cos(lat1)·cos(lat2)·sin²(Δlon/2)
-            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
-                  + Math.Cos(ToRadians((double)lat1)) * Math.Cos(ToRadians((double)lat2))
-                  * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-
-            // c = 2·atan2(√a, √(1−a)) — góc trung tâm (radian)
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-            return (decimal)(r * c); // Khoảng cách = bán kính × góc trung tâm
-        }
-
-        /// <summary>Chuyển đổi góc từ độ sang radian.</summary>
-        private static double ToRadians(double degrees) => degrees * (Math.PI / 180d);
     }
 }

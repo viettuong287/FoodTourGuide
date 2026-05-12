@@ -179,18 +179,33 @@ public class QrCodeController(AppDbContext db) : AppControllerBase
         if (qrCode is null)
             return this.OkResult(new { isValid = false, message = "Mã QR không tồn tại." });
 
-        var usedAt = DateTime.UtcNow;
-        var expiryAt = usedAt.AddDays(qrCode.ValidDays);
+        var now = DateTime.UtcNow;
 
-        // Ghi nhận lần quét đầu tiên; các lần quét sau không cập nhật DB.
-        if (!qrCode.IsUsed)
+        // Tính thời điểm hết hạn DỰA TRÊN lần quét đầu tiên (UsedAt cố định),
+        // không trượt mỗi lần verify lại — bảo đảm "hạn 7 ngày" nghĩa là 7 ngày từ
+        // lần quét đầu, chứ không phải gia hạn vô hạn.
+        DateTime usedAt;
+        if (qrCode.IsUsed && qrCode.UsedAt.HasValue)
         {
+            usedAt = qrCode.UsedAt.Value;
+        }
+        else
+        {
+            usedAt = now;
             await db.QrCodes
                 .Where(q => q.Code == request.Code && !q.IsUsed)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(q => q.IsUsed, true)
                     .SetProperty(q => q.UsedAt, usedAt)
                     .SetProperty(q => q.UsedByDeviceId, request.DeviceId), ct);
+        }
+
+        var expiryAt = usedAt.AddDays(qrCode.ValidDays);
+
+        // Mã đã quá hạn → trả về isValid=false để mobile bắt user mua/lấy vé mới.
+        if (expiryAt <= now)
+        {
+            return this.OkResult(new { isValid = false, message = "Mã QR đã hết hạn.", expiryAt });
         }
 
         return this.OkResult(new { isValid = true, message = "OK", expiryAt });
