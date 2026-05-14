@@ -58,7 +58,7 @@ public partial class QRScannerPage : ContentPage
 
             // Gọi API xác thực mã QR vé
             var apiService = IPlatformApplication.Current?.Services.GetService<Services.ApiService>();
-            Services.QrVerifyData verifyData = null;
+            Services.QrVerifyData? verifyData = null;
 
             if (apiService != null)
             {
@@ -73,7 +73,7 @@ public partial class QRScannerPage : ContentPage
             {
                 // Mã không hợp lệ theo Server
                 string reason = string.IsNullOrEmpty(verifyData.Message) ? lm.TicketInvalidMessage : verifyData.Message;
-                await DisplayAlert(lm.ErrorTitle, reason, lm.ScanAgainButton);
+                await DisplayAlertAsync(lm.ErrorTitle, reason, lm.ScanAgainButton);
                 CameraReader.IsDetecting = true;
             }
             else
@@ -85,7 +85,7 @@ public partial class QRScannerPage : ContentPage
                 }
                 else
                 {
-                    await DisplayAlert(lm.ErrorTitle, lm.TicketInvalidMessage, lm.ScanAgainButton);
+                    await DisplayAlertAsync(lm.ErrorTitle, lm.TicketInvalidMessage, lm.ScanAgainButton);
                     CameraReader.IsDetecting = true;
                 }
             }
@@ -107,7 +107,7 @@ public partial class QRScannerPage : ContentPage
             msg += $"\n{lm.UpdateTitle}: {expiry}";
         }
 
-        await DisplayAlert(lm.SuccessTitle, msg, lm.TicketSuccessButton);
+        await DisplayAlertAsync(lm.SuccessTitle, msg, lm.TicketSuccessButton);
         AppNavigation.GoToPostSplashRoot();
     }
 
@@ -129,7 +129,7 @@ public partial class QRScannerPage : ContentPage
         }
 
         var lm = LocalizationManager.Instance;
-        bool confirm = await DisplayAlert(lm.ExitAppTitle, lm.ExitAppMessage, lm.YesButton, lm.NoButton);
+        bool confirm = await DisplayAlertAsync(lm.ExitAppTitle, lm.ExitAppMessage, lm.YesButton, lm.NoButton);
         if (confirm) Application.Current?.Quit();
     }
 

@@ -331,6 +331,69 @@ public class ApiService
         catch (Exception ex) { Console.WriteLine($"[LocationBatch] {ex.Message}"); }
     }
 
+    /// <summary>Xếp hàng phát thuyết minh tự động tại một stall (FIFO nhiều thiết bị).</summary>
+    public async Task<NarrationQueueJoinResponse?> NarrationQueueJoinAsync(string stallId, CancellationToken ct = default)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return null;
+            if (string.IsNullOrWhiteSpace(stallId)) return null;
+            var deviceId = GetOrCreateDeviceId();
+            var body = new { stallId, deviceId };
+            var response = await _httpClient.PostAsJsonAsync("narration-queue/join", body, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return await response.Content.ReadFromJsonAsync<NarrationQueueJoinResponse>(options, ct);
+        }
+        catch (Exception ex) { Console.WriteLine($"[NarrationQueue] join {ex.Message}"); }
+        return null;
+    }
+
+    public async Task<int?> NarrationQueueGetAheadAsync(string stallId, CancellationToken ct = default)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return null;
+            if (string.IsNullOrWhiteSpace(stallId)) return null;
+            var deviceId = GetOrCreateDeviceId();
+            var url = $"narration-queue/status?stallId={Uri.EscapeDataString(stallId)}&deviceId={Uri.EscapeDataString(deviceId)}";
+            var response = await _httpClient.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var dto = await response.Content.ReadFromJsonAsync<NarrationQueueStatusDto>(options, ct);
+            if (dto is not { InQueue: true }) return null;
+            return dto.AheadCount;
+        }
+        catch (Exception ex) { Console.WriteLine($"[NarrationQueue] status {ex.Message}"); }
+        return null;
+    }
+
+    public async Task NarrationQueueLeaveAsync(string stallId, string ticketId, CancellationToken ct = default)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return;
+            if (string.IsNullOrWhiteSpace(stallId) || string.IsNullOrWhiteSpace(ticketId)) return;
+            if (ticketId.StartsWith("local-", StringComparison.Ordinal)) return;
+            var body = new { stallId, ticketId };
+            await _httpClient.PostAsJsonAsync("narration-queue/leave", body, ct);
+        }
+        catch (Exception ex) { Console.WriteLine($"[NarrationQueue] leave {ex.Message}"); }
+    }
+
+    public async Task NarrationQueueCompleteAsync(string stallId, string ticketId, CancellationToken ct = default)
+    {
+        try
+        {
+            if (Connectivity.Current.NetworkAccess != NetworkAccess.Internet) return;
+            if (string.IsNullOrWhiteSpace(stallId) || string.IsNullOrWhiteSpace(ticketId)) return;
+            if (ticketId.StartsWith("local-", StringComparison.Ordinal)) return;
+            var body = new { stallId, ticketId };
+            await _httpClient.PostAsJsonAsync("narration-queue/complete", body, ct);
+        }
+        catch (Exception ex) { Console.WriteLine($"[NarrationQueue] complete {ex.Message}"); }
+    }
+
     /// <summary>
     /// Lấy DeviceId duy nhất của thiết bị. Nếu chưa có trong Preferences thì sinh mới Guid và lưu lại.
     /// Public static để các page (chọn ngôn ngữ / chọn giọng) cũng dùng được khi POST device-preference.
@@ -553,6 +616,18 @@ public class LocationLogEntry
     public double Longitude { get; set; }
     public double? Accuracy { get; set; }
     public DateTimeOffset RecordedAt { get; set; }
+}
+
+public class NarrationQueueJoinResponse
+{
+    public string TicketId { get; set; } = string.Empty;
+    public int AheadCount { get; set; }
+}
+
+public class NarrationQueueStatusDto
+{
+    public bool InQueue { get; set; }
+    public int? AheadCount { get; set; }
 }
 
 /// <summary>

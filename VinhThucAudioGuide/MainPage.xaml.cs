@@ -59,6 +59,22 @@ namespace VinhThucAudioGuide
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        /// <summary>Nhãn góc phải card POI: "Lượt đợi còn: n" — rỗng khi không chờ.</summary>
+        private string _queueWaitText = string.Empty;
+        public string QueueWaitText
+        {
+            get => _queueWaitText;
+            set
+            {
+                if (_queueWaitText == value) return;
+                _queueWaitText = value ?? string.Empty;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(QueueWaitText)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(HasQueueWaitLabel)));
+            }
+        }
+
+        public bool HasQueueWaitLabel => !string.IsNullOrEmpty(_queueWaitText);
     }
 
     public partial class MainPage : ContentPage
@@ -70,9 +86,24 @@ namespace VinhThucAudioGuide
         private int _speechId = 0;
         private POI _selectedPoiForAudio = null;
         private string _activeCategoryFilter = string.Empty;
-        // POI vua duoc auto-play do GPS gan day. Reset khi user roi khoi vung,
-        // de lan toi quay lai se phat lai. Tranh spam phat lap khi user dung tai cho.
-        private string? _lastAutoPlayedPoiServerId;
+
+        /// <summary>Bán kính (mét) để xếp hàng + tự phát thuyết minh một lần khi vào vùng (theo yêu cầu ~3km).</summary>
+        private const double AutoNarrationRadiusMeters = 3000;
+
+        private sealed class StallZoneState
+        {
+            public bool InAutoZone;
+            public string? TicketId;
+            public bool EnqueuedOnPhone;
+        }
+
+        private readonly Dictionary<string, StallZoneState> _stallZoneStates = new(StringComparer.OrdinalIgnoreCase);
+
+        private sealed record GlobalAutoItem(string StallId, string TicketId, POI Poi);
+
+        private readonly List<GlobalAutoItem> _globalAutoQueue = new();
+        private readonly object _globalAutoLock = new();
+        private readonly SemaphoreSlim _autoProcessorLock = new(1, 1);
 
         // Background GPS tracking
         private CancellationTokenSource _locationCts;
@@ -137,8 +168,18 @@ namespace VinhThucAudioGuide
                             mapView.MyLocationLayer.UpdateMyLocation(
                                 new Mapsui.UI.Maui.Position(loc.Latitude, loc.Longitude)));
 
-                        // Kiem tra GPS co vao trong vung POI nao khong -> auto-play
-                        CheckProximityAutoPlay(loc);
+                        MainThread.BeginInvokeOnMainThread(async () =>
+                        {
+                            try
+                            {
+                                await UpdateAutoNarrationZonesAsync(loc);
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[AutoNarr] {ex.Message}");
+                            }
+                            KickAutoNarrationProcessor();
+                        });
 
                         var entry = new Services.LocationLogEntry
                         {
@@ -174,44 +215,244 @@ namespace VinhThucAudioGuide
         }
 
         /// <summary>
-        /// Khi GPS cap nhat, kiem tra xem user co vao trong vung RadiusMeters cua POI nao khong.
-        /// Neu co va POI do khac POI vua phat thi tu dong phat thuyet minh.
-        /// Toggle "AutoPlay" trong Settings co the tat tinh nang nay.
+        /// Vùng ~3km quanh POI: vào vùng thì join hàng chờ server + hàng chờ cục bộ (một loa).
+        /// Rời vùng thì leave server và gỡ khỏi hàng chờ chưa phát.
         /// </summary>
-        private void CheckProximityAutoPlay(Location userLoc)
+        private async Task UpdateAutoNarrationZonesAsync(Location userLoc)
         {
             if (_allPois == null || _allPois.Count == 0) return;
             if (!Preferences.Default.Get("AutoPlay", true)) return;
 
-            POI? insidePoi = null;
-            double bestDistance = double.MaxValue;
+            var api = IPlatformApplication.Current?.Services.GetService<ApiService>();
+
+            var toExit = new List<(string sid, POI poi, StallZoneState st)>();
+            var toEnter = new List<(POI poi, string sid, double dist)>();
+
             foreach (var poi in _allPois)
             {
-                if (string.IsNullOrWhiteSpace(poi.AudioUrl)) continue; // POI chua co audio thi bo qua
-                double dist = HaversineMeters(userLoc.Latitude, userLoc.Longitude, poi.Latitude, poi.Longitude);
-                double radius = poi.RadiusMeters > 0 ? poi.RadiusMeters : 50;
-                if (dist <= radius && dist < bestDistance)
+                if (string.IsNullOrWhiteSpace(poi.AudioUrl)) continue;
+                var sid = poi.ServerId?.Trim() ?? string.Empty;
+                if (string.IsNullOrEmpty(sid)) continue;
+
+                if (!_stallZoneStates.TryGetValue(sid, out var st))
                 {
-                    insidePoi = poi;
-                    bestDistance = dist;
+                    st = new StallZoneState();
+                    _stallZoneStates[sid] = st;
+                }
+
+                var dist = HaversineMeters(userLoc.Latitude, userLoc.Longitude, poi.Latitude, poi.Longitude);
+                var inside = dist <= AutoNarrationRadiusMeters;
+
+                if (!inside && st.InAutoZone)
+                    toExit.Add((sid, poi, st));
+                else if (inside && !st.InAutoZone)
+                    toEnter.Add((poi, sid, dist));
+                else if (inside && st.InAutoZone)
+                    await RefreshPoiWaitLabelAsync(poi, sid, api);
+            }
+
+            foreach (var (sid, poi, st) in toExit)
+                await ExitAutoZoneAsync(sid, poi, st, api);
+
+            toEnter.Sort((a, b) => a.dist.CompareTo(b.dist));
+            foreach (var (poi, sid, _) in toEnter)
+                await EnterAutoZoneAsync(poi, sid, api);
+        }
+
+        private async Task ExitAutoZoneAsync(string sid, POI poi, StallZoneState st, ApiService? api)
+        {
+            st.InAutoZone = false;
+            if (!string.IsNullOrEmpty(st.TicketId))
+            {
+                if (api != null)
+                    await api.NarrationQueueLeaveAsync(sid, st.TicketId);
+                lock (_globalAutoLock)
+                {
+                    _globalAutoQueue.RemoveAll(x =>
+                        string.Equals(x.StallId, sid, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(x.TicketId, st.TicketId, StringComparison.Ordinal));
                 }
             }
 
-            if (insidePoi == null)
+            st.TicketId = null;
+            st.EnqueuedOnPhone = false;
+            poi.QueueWaitText = string.Empty;
+        }
+
+        private async Task EnterAutoZoneAsync(POI poi, string sid, ApiService? api)
+        {
+            if (!_stallZoneStates.TryGetValue(sid, out var st)) return;
+            st.InAutoZone = true;
+
+            NarrationQueueJoinResponse? join = null;
+            if (api != null)
+                join = await api.NarrationQueueJoinAsync(sid);
+
+            st.TicketId = string.IsNullOrWhiteSpace(join?.TicketId)
+                ? $"local-{Guid.NewGuid():N}"
+                : join!.TicketId;
+
+            if (!st.EnqueuedOnPhone)
             {
-                // Ra khoi moi vung POI -> reset de lan toi vao lai se phat moi
-                _lastAutoPlayedPoiServerId = null;
-                return;
+                st.EnqueuedOnPhone = true;
+                lock (_globalAutoLock)
+                    _globalAutoQueue.Add(new GlobalAutoItem(sid, st.TicketId, poi));
             }
 
-            if (string.Equals(insidePoi.ServerId, _lastAutoPlayedPoiServerId, StringComparison.OrdinalIgnoreCase))
-                return; // van dang trong vung POI vua phat -> khong phat lap
+            await RefreshPoiWaitLabelAsync(poi, sid, api);
+        }
 
-            _lastAutoPlayedPoiServerId = insidePoi.ServerId;
-            MainThread.BeginInvokeOnMainThread(async () =>
+        private int GetGlobalQueueIndex(string stallId)
+        {
+            lock (_globalAutoLock)
             {
-                await PlayPoiAudioAsync(insidePoi, manualTrigger: false);
-            });
+                var i = _globalAutoQueue.FindIndex(x =>
+                    string.Equals(x.StallId, stallId, StringComparison.OrdinalIgnoreCase));
+                return i < 0 ? 0 : i;
+            }
+        }
+
+        private async Task RefreshPoiWaitLabelAsync(POI poi, string sid, ApiService? api)
+        {
+            var lm = LocalizationManager.Instance;
+            var serverAhead = 0;
+            if (api != null)
+            {
+                var a = await api.NarrationQueueGetAheadAsync(sid);
+                serverAhead = a ?? 0;
+            }
+
+            var gIdx = GetGlobalQueueIndex(sid);
+            var total = serverAhead + gIdx;
+            var text = total > 0 ? string.Format(lm.QueueWaitRemainingFormat, total) : string.Empty;
+            await MainThread.InvokeOnMainThreadAsync(() => poi.QueueWaitText = text);
+        }
+
+        private void KickAutoNarrationProcessor()
+        {
+            _ = Task.Run(ProcessAutoNarrationQueueLoopAsync);
+        }
+
+        private async Task ProcessAutoNarrationQueueLoopAsync()
+        {
+            await _autoProcessorLock.WaitAsync();
+            try
+            {
+                var api = IPlatformApplication.Current?.Services.GetService<ApiService>();
+
+                while (true)
+                {
+                    GlobalAutoItem? item = null;
+                    lock (_globalAutoLock)
+                    {
+                        if (_globalAutoQueue.Count > 0)
+                            item = _globalAutoQueue[0];
+                    }
+
+                    if (item == null)
+                        break;
+
+                    var loc = _currentUserLocation;
+                    if (loc != null)
+                    {
+                        var dist = HaversineMeters(loc.Latitude, loc.Longitude, item.Poi.Latitude, item.Poi.Longitude);
+                        if (dist > AutoNarrationRadiusMeters)
+                        {
+                            await CleanupStaleHeadItemAsync(api, item);
+                            continue;
+                        }
+                    }
+
+                    int? serverAheadNullable = api != null ? await api.NarrationQueueGetAheadAsync(item.StallId) : 0;
+                    var serverAhead = serverAheadNullable ?? 0;
+                    var gIdx = GetGlobalQueueIndex(item.StallId);
+                    var waitTotal = serverAhead + gIdx;
+
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        var lm = LocalizationManager.Instance;
+                        item.Poi.QueueWaitText = waitTotal > 0
+                            ? string.Format(lm.QueueWaitRemainingFormat, waitTotal)
+                            : string.Empty;
+                    });
+
+                    if (serverAhead > 0 || gIdx > 0)
+                    {
+                        await Task.Delay(1500);
+                        continue;
+                    }
+
+                    await MainThread.InvokeOnMainThreadAsync(() => item.Poi.QueueWaitText = string.Empty);
+
+                    var playId = await PlayPoiAudioAsync(item.Poi, manualTrigger: false);
+
+                    if (playId.HasValue)
+                        await WaitForPlaybackSessionEndAsync(playId.Value);
+
+                    if (api != null)
+                        await api.NarrationQueueCompleteAsync(item.StallId, item.TicketId);
+
+                    lock (_globalAutoLock)
+                    {
+                        if (_globalAutoQueue.Count > 0
+                            && string.Equals(_globalAutoQueue[0].TicketId, item.TicketId, StringComparison.Ordinal)
+                            && string.Equals(_globalAutoQueue[0].StallId, item.StallId, StringComparison.Ordinal))
+                            _globalAutoQueue.RemoveAt(0);
+                    }
+
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        if (_stallZoneStates.TryGetValue(item.StallId, out var s)
+                            && string.Equals(s.TicketId, item.TicketId, StringComparison.Ordinal))
+                        {
+                            s.TicketId = null;
+                            s.EnqueuedOnPhone = false;
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[AutoNarrLoop] {ex.Message}");
+            }
+            finally
+            {
+                _autoProcessorLock.Release();
+            }
+        }
+
+        private async Task CleanupStaleHeadItemAsync(ApiService? api, GlobalAutoItem item)
+        {
+            if (api != null)
+                await api.NarrationQueueLeaveAsync(item.StallId, item.TicketId);
+
+            lock (_globalAutoLock)
+            {
+                if (_globalAutoQueue.Count > 0
+                    && string.Equals(_globalAutoQueue[0].TicketId, item.TicketId, StringComparison.Ordinal))
+                    _globalAutoQueue.RemoveAt(0);
+            }
+
+            await MainThread.InvokeOnMainThreadAsync(() => item.Poi.QueueWaitText = string.Empty);
+        }
+
+        private async Task WaitForPlaybackSessionEndAsync(int playSessionId)
+        {
+            for (var n = 0; n < 4000; n++)
+            {
+                await Task.Delay(100);
+                if (_speechId != playSessionId)
+                    return;
+                try
+                {
+                    if (_currentAudioPlayer == null || !_currentAudioPlayer.IsPlaying)
+                        return;
+                }
+                catch
+                {
+                    return;
+                }
+            }
         }
 
         /// <summary>
@@ -500,14 +741,12 @@ namespace VinhThucAudioGuide
         /// <summary>
         /// Phat thuyet minh cua mot POI. Goi tu:
         ///  - Speak_Clicked (user bam nut)
-        ///  - CheckProximityAutoPlay (GPS vao trong RadiusMeters cua POI)
+        ///  - Hang cho tu dong (GPS trong vung ~3km)
         /// </summary>
-        /// <param name="poi">POI can phat. AudioUrl phai khac null.</param>
-        /// <param name="manualTrigger">true neu user chu dong bam nut -> hien alert khi loi.
-        /// false neu auto-play do gan POI -> im lang khi khong co audio.</param>
-        private async Task PlayPoiAudioAsync(POI poi, bool manualTrigger)
+        /// <returns>Ma phien phat (_speechId) neu da bat dau phat; null neu khong phat duoc.</returns>
+        private async Task<int?> PlayPoiAudioAsync(POI poi, bool manualTrigger)
         {
-            if (poi == null) return;
+            if (poi == null) return null;
 
             if (string.IsNullOrWhiteSpace(poi.AudioUrl))
             {
@@ -516,7 +755,7 @@ namespace VinhThucAudioGuide
                     var lmAudio = LocalizationManager.Instance;
                     await DisplayAlert(lmAudio.PoiMissingAudioTitle, lmAudio.PoiMissingAudioMessage, lmAudio.OkButton);
                 }
-                return;
+                return null;
             }
 
             _speechId++;
@@ -526,7 +765,7 @@ namespace VinhThucAudioGuide
             try
             {
                 var bytes = await Services.ApiService.DownloadAudioAsync(poi.AudioUrl);
-                if (currentId != _speechId) return; // user da bam Stop hoac chuyen POI
+                if (currentId != _speechId) return null;
                 if (bytes == null || bytes.Length == 0)
                 {
                     if (manualTrigger)
@@ -534,12 +773,13 @@ namespace VinhThucAudioGuide
                         var lm = LocalizationManager.Instance;
                         await DisplayAlert(lm.AudioErrorTitle, lm.TtsPlaybackFailedMessage, lm.OkButton);
                     }
-                    return;
+                    return null;
                 }
 
                 _currentAudioPlayer?.Stop();
                 _currentAudioPlayer = AudioManager.Current.CreatePlayer(new MemoryStream(bytes));
                 _currentAudioPlayer.Play();
+                return currentId;
             }
             catch (Exception ex)
             {
@@ -549,6 +789,7 @@ namespace VinhThucAudioGuide
                     var lm = LocalizationManager.Instance;
                     await DisplayAlert(lm.AudioErrorTitle, ex.Message, lm.OkButton);
                 }
+                return null;
             }
         }
 
